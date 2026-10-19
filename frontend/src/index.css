@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-ExtraBold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('/fonts/Muller-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* 3 Renk Disiplini (60 - 30 - 10) Tasarım Belirteçleri */
+  --bg-primary: #F4EFEA;       /* %60 Sıcak Hukuk Beji */
+  --bg-surface: #FFFFFF;       /* Kart ve Doküman İçi */
+  --bg-subtle: #EAE3DC;        /* Ayrıcı Çizgiler & Pasif Zemin */
+
+  --text-main: #121316;        /* %30 Mürekkep Siyahı */
+  --text-muted: #575A65;       /* Açıklama ve Alt Metinler */
+  --border-dark: #121316;      /* Sert Çerçeveler */
+  --shadow-dark: #121316;      /* Sert Düşen Gölgeler */
+
+  --primary-accent: #1E3A8A;   /* %10 Hukuk Laciverti */
+  --primary-hover: #172554;    /* Lacivert Hover */
+  --primary-text: #FFFFFF;     /* Buton İçi Beyaz Yazı */
+}
+
+@theme {
+  --font-sans: 'Muller', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Muller', monospace, sans-serif;
+
+  --color-sand: #F4EFEA;
+  --color-charcoal: #121316;
+  --color-cobalt: #1E3A8A;
+  --color-cobalt-hover: #172554;
+  --color-muted: #575A65;
+  --color-subtle: #EAE3DC;
+}
+
+*,
+*::before,
+*::after {
+  font-family: 'Muller', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: 'Muller', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #F4EFEA;
+  color: #121316;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  touch-action: pan-x pan-y;
+}
+
+/* Neo-Brutalist Yapı Sınıfları */
+.brutal-border {
+  border: 2px solid #121316;
+}
+
+.brutal-border-sm {
+  border: 1.5px solid #121316;
+}
+
+.brutal-border-lg {
+  border: 3px solid #121316;
+}
+
+.brutal-shadow {
+  box-shadow: 3px 3px 0px 0px #121316;
+}
+
+.brutal-shadow-sm {
+  box-shadow: 2px 2px 0px 0px #121316;
+}
+
+.brutal-shadow-lg {
+  box-shadow: 5px 5px 0px 0px #121316;
+}
+
+.brutal-shadow-xl {
+  box-shadow: 7px 7px 0px 0px #121316;
+}
+
+/* Dokunsal Neo-Brutalist Butonlar */
+.brutal-btn {
+  border: 2px solid #121316;
+  box-shadow: 3px 3px 0px 0px #121316;
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.brutal-btn:hover:not(:disabled) {
+  transform: translate(-1.5px, -1.5px);
+  box-shadow: 4.5px 4.5px 0px 0px #121316;
+}
+
+.brutal-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px 0px #121316;
+}
+
+.brutal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: 1px 1px 0px 0px #121316;
+}
+
+/* Birincil Eylem Butonu (Primary CTA - Hukuk Laciverti) */
+.brutal-btn-primary {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
+  border: 2px solid #121316 !important;
+  box-shadow: 3px 3px 0px 0px #121316 !important;
+}
+
+.brutal-btn-primary:hover:not(:disabled) {
+  background-color: #172554 !important;
+  transform: translate(-1.5px, -1.5px);
+  box-shadow: 4.5px 4.5px 0px 0px #121316 !important;
+}
+
+.brutal-btn-primary:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px 0px #121316 !important;
+}
+
+/* Seçili / Aktif Buton Durumu */
+.brutal-btn-active {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
+  border-color: #121316 !important;
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px 0px #121316 !important;
+}
+
+.brutal-card {
+  border: 2px solid #121316;
+  box-shadow: 4px 4px 0px 0px #121316;
+  background-color: #FFFFFF;
+}
+
+.brutal-card-interactive {
+  border: 2px solid #121316;
+  box-shadow: 4px 4px 0px 0px #121316;
+  background-color: #FFFFFF;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.brutal-card-interactive:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0px 0px #121316;
+}
+
+/* Sakin ve Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EAE3DC;
+  border-left: 1.5px solid #121316;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #121316;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #575A65;
+}
