@@ -125,7 +125,12 @@ export const api = {
     inputPaths: string[],
     combine: boolean,
     rotations?: Record<string, number>,
-    outputDir?: string
+    outputDir?: string,
+    excelOptions?: {
+      orientation?: 'auto' | 'landscape' | 'portrait';
+      fit_width?: boolean;
+      repeat_header?: boolean;
+    }
   ): Promise<{ success: boolean; output_paths: string[]; errors: string[] }> {
     const res = await fetch(`${API_BASE}/api/convert-images`, {
       method: 'POST',
@@ -135,11 +140,54 @@ export const api = {
         combine,
         rotations: rotations || {},
         output_dir: outputDir,
+        excel_options: excelOptions || {},
       }),
     });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Dönüştürme hatası');
+    }
+    return res.json();
+  },
+
+  async analyzeExcel(excelPath: string): Promise<{
+    sheet_count: number;
+    sheets: Array<{ name: string; max_row: number; max_col: number; recommended_orientation: string }>;
+    overall_recommended_orientation: 'landscape' | 'portrait';
+  }> {
+    const res = await fetch(`${API_BASE}/api/analyze-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: excelPath }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Excel analizi başarısız');
+    }
+    return res.json();
+  },
+
+  async convertExcel(
+    inputPath: string,
+    outputPath?: string,
+    orientation: 'auto' | 'landscape' | 'portrait' = 'auto',
+    fitWidth: boolean = true,
+    repeatHeader: boolean = true
+  ): Promise<{ success: boolean; output_path: string }> {
+    const res = await fetch(`${API_BASE}/api/convert-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input_path: inputPath,
+        output_path: outputPath,
+        orientation,
+        fit_width: fitWidth,
+        repeat_header: repeatHeader,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Excel dönüştürme hatası');
     }
     return res.json();
   },

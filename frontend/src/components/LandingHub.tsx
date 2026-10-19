@@ -140,14 +140,14 @@ export const LandingHub: React.FC<LandingHubProps> = ({ onSelectMode }) => {
               </div>
 
               <h3 className="text-2xl font-black text-[#121316] mb-2 tracking-tight">
-                Görsel Dönüştür
+                Evrak & Tablo Dönüştür
               </h3>
               <p className="text-sm text-[#575A65] font-medium leading-relaxed mb-6">
-                Delil niteliğindeki tekli veya çoklu sayfa TIFF, JPEG ve PNG taramalarını kalite kaybı yaşamadan tek tıkla standart PDF formatına dönüştürün.
+                Delil niteliğindeki TIFF, JPEG, PNG taramaları ile hesaplama, ekstre ve faiz içeren Excel (.xlsx, .xls) tablolarını aslına uygun, sütun bölünmesiz UYAP PDF formatına dönüştürün.
               </p>
 
               <div className="flex flex-wrap gap-1.5 mb-6">
-                {['Çok Sayfalı TIFF', 'JPEG / PNG', 'Toplu Birleştirme'].map((tag) => (
+                {['Excel (.xlsx, .xls)', 'Çok Sayfalı TIFF', 'JPEG / PNG', 'Akıllı Sığdırma'].map((tag) => (
                   <span
                     key={tag}
                     className="text-[11px] font-bold px-2 py-0.5 bg-[#F4EFEA] border border-[#121316] text-[#121316]"

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import {
   ArrowLeft,
   FileImage,
+  FileSpreadsheet,
+  Table,
+  Sliders,
   Check,
   Trash2,
   FolderOpen,
@@ -25,12 +28,17 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [rotations, setRotations] = useState<Record<string, number>>({});
   const [combineIntoOne, setCombineIntoOne] = useState<boolean>(true);
+  const [excelOrientation, setExcelOrientation] = useState<'auto' | 'landscape' | 'portrait'>('auto');
+  const [fitAllColumns, setFitAllColumns] = useState<boolean>(true);
+  const [repeatHeaderRow, setRepeatHeaderRow] = useState<boolean>(true);
   const [isConverting, setIsConverting] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<{
     success: boolean;
     text: string;
     files: string[];
   } | null>(null);
+
+  const hasExcelFiles = selectedPaths.some((p) => /\.(xlsx|xls)$/i.test(p));
 
   // Dosya Seçim Dialogu
   const handleSelectFiles = async () => {
@@ -100,13 +108,23 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
     setResultMessage(null);
 
     try {
-      const res = await api.convertImages(selectedPaths, combineIntoOne, rotations);
+      const res = await api.convertImages(
+        selectedPaths,
+        combineIntoOne,
+        rotations,
+        undefined,
+        {
+          orientation: excelOrientation,
+          fit_width: fitAllColumns,
+          repeat_header: repeatHeaderRow,
+        }
+      );
       if (res.success) {
         setResultMessage({
           success: true,
           text: combineIntoOne
-            ? `${selectedPaths.length} adet görsel başarıyla tek bir PDF dosyasında birleştirildi.`
-            : `${selectedPaths.length} adet görsel ayrı ayrı PDF formatına dönüştürüldü.`,
+            ? `${selectedPaths.length} adet evrak/tablo başarıyla tek bir UYAP PDF dosyasında birleştirildi.`
+            : `${selectedPaths.length} adet evrak/tablo ayrı ayrı UYAP PDF formatına dönüştürüldü.`,
           files: res.output_paths,
         });
       } else {
@@ -141,8 +159,8 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
           </button>
           <div className="h-5 w-[1.5px] bg-[#121316]/20" />
           <div className="flex items-center gap-2">
-            <FileImage className="w-5 h-5 text-[#121316]" />
-            <h2 className="font-black text-sm tracking-tight">Görsel Belge Dönüştürücü</h2>
+            <FileSpreadsheet className="w-5 h-5 text-[#121316]" />
+            <h2 className="font-black text-sm tracking-tight">Evrak & Tablo Dönüştürücü (Görsel & Excel)</h2>
           </div>
         </div>
 
@@ -175,14 +193,14 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               className="brutal-card p-12 text-center bg-[#FFFFFF] cursor-pointer hover:border-[#1E3A8A] transition-colors border-2 border-dashed border-[#121316]"
             >
               <div className="w-20 h-20 bg-[#F4EFEA] border-2 border-[#121316] flex items-center justify-center mx-auto mb-6 brutal-shadow-sm">
-                <FileImage className="w-10 h-10 text-[#121316]" />
+                <FileSpreadsheet className="w-10 h-10 text-[#121316]" />
               </div>
 
               <h3 className="text-2xl font-black text-[#121316] mb-2">
-                Dönüştürülecek Görselleri Seçin
+                Dönüştürülecek Evrak ve Tabloları Seçin
               </h3>
               <p className="text-sm text-[#575A65] max-w-lg mx-auto mb-6 font-medium">
-                TIFF, TIF, JPEG, JPG, PNG formatındaki taranmış delil belgelerini veya fotoğrafları seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
+                TIFF, TIF, JPEG, JPG, PNG formatındaki taramaları veya hesaplama/ekstre içeren Excel (.xlsx, .xls) tablolarını seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
               </p>
 
               <button className="brutal-btn py-3.5 px-8 bg-[#121316] text-white font-bold text-sm inline-flex items-center gap-2 hover:bg-[#1E3A8A] transition-colors">
@@ -191,6 +209,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               </button>
 
               <div className="mt-8 flex items-center justify-center gap-6 text-xs text-[#575A65] font-semibold">
+                <span>✓ Excel Akıllı Sütun Sığdırma</span>
                 <span>✓ Çok Sayfalı TIFF Desteği</span>
                 <span>✓ UYAP Standartlarına Uygun</span>
                 <span>✓ %100 Çevrimdışı & Yerel</span>
@@ -207,7 +226,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                   Dönüştürme Modu
                 </span>
                 <p className="text-xs text-[#575A65] font-medium">
-                  {selectedPaths.length} adet görsel kuyrukta bekliyor.
+                  {selectedPaths.length} adet dosya kuyrukta bekliyor.
                 </p>
               </div>
 
@@ -234,6 +253,97 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               </div>
             </div>
 
+            {/* Excel Configuration Panel (Visible when Excel files exist in queue) */}
+            {hasExcelFiles && (
+              <div className="brutal-card p-5 bg-[#FFFFFF] border-2 border-[#121316]">
+                <div className="flex items-center justify-between border-b-2 border-[#121316] pb-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Table className="w-4 h-4 text-[#1E3A8A]" />
+                    <span className="text-xs font-black uppercase text-[#121316]">
+                      Excel UYAP Uyum ve Sığdırma Ayarları
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-[#1E3A8A] text-white">
+                    Sütun Bölünmesini Önler
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sayfa Yönlendirmesi */}
+                  <div>
+                    <label className="text-xs font-bold text-[#121316] block mb-2">
+                      Sayfa Yönü (Orientation)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setExcelOrientation('auto')}
+                        className={`brutal-btn px-3 py-1.5 text-xs font-bold transition-all ${
+                          excelOrientation === 'auto'
+                            ? 'bg-[#121316] text-white'
+                            : 'bg-[#F4EFEA] text-[#121316]'
+                        }`}
+                        title="Tablonun sütun sayısına göre (≥6 sütun ise Yatay) otomatik belirler"
+                      >
+                        ⚡ Akıllı Otomatik
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExcelOrientation('landscape')}
+                        className={`brutal-btn px-3 py-1.5 text-xs font-bold transition-all ${
+                          excelOrientation === 'landscape'
+                            ? 'bg-[#121316] text-white'
+                            : 'bg-[#F4EFEA] text-[#121316]'
+                        }`}
+                        title="Tüm tabloları yatay A4 (Landscape) sayfaya basar"
+                      >
+                        ↔ Yatay (Geniş Tablo)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExcelOrientation('portrait')}
+                        className={`brutal-btn px-3 py-1.5 text-xs font-bold transition-all ${
+                          excelOrientation === 'portrait'
+                            ? 'bg-[#121316] text-white'
+                            : 'bg-[#F4EFEA] text-[#121316]'
+                        }`}
+                        title="Dikey A4 (Portrait) sayfaya basar"
+                      >
+                        ↕ Dikey
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sığdırma & Başlık Seçenekleri */}
+                  <div className="flex flex-col justify-center gap-2.5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={fitAllColumns}
+                        onChange={(e) => setFitAllColumns(e.target.checked)}
+                        className="w-4 h-4 accent-[#1E3A8A] rounded-none cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-[#121316]">
+                        Tüm Sütunları Tek Sayfa Genişliğine Sığdır (Fit to Width)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={repeatHeaderRow}
+                        onChange={(e) => setRepeatHeaderRow(e.target.checked)}
+                        className="w-4 h-4 accent-[#1E3A8A] rounded-none cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-[#121316]">
+                        Tablo Başlık Satırını Her Sayfada Yinele (Repeat Headers)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* List of files with Thumbnail, Rotate, and Reorder */}
             <div className="brutal-card bg-[#FFFFFF] p-4">
               <div className="flex items-center justify-between border-b-2 border-[#121316] pb-2 mb-3">
@@ -253,6 +363,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                 {selectedPaths.map((filePath, index) => {
                   const fileName = filePath.split(/[/\\]/).pop() || filePath;
                   const ext = fileName.split('.').pop()?.toUpperCase() || '';
+                  const isExcel = /\.(xlsx|xls)$/i.test(filePath);
                   const rot = rotations[filePath] || 0;
 
                   return (
@@ -267,25 +378,39 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                           {index + 1}
                         </div>
 
-                        {/* Canlı Küçük Resim Önizlemesi (Thumbnail) */}
+                        {/* Canlı Küçük Resim Önizlemesi (Thumbnail / Excel İkonu) */}
                         <div className="w-12 h-12 bg-[#F4EFEA] border border-[#121316] shrink-0 overflow-hidden flex items-center justify-center relative">
-                          <img
-                            src={api.getImageThumbnailUrl(filePath, rot)}
-                            alt={fileName}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+                          {isExcel ? (
+                            <FileSpreadsheet className="w-6 h-6 text-[#1E3A8A]" />
+                          ) : (
+                            <img
+                              src={api.getImageThumbnailUrl(filePath, rot)}
+                              alt={fileName}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          )}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className="px-1.5 py-0.2 bg-[#F4EFEA] border border-[#121316] text-[10px] font-black">
+                            <span className={`px-1.5 py-0.2 border text-[10px] font-black ${
+                              isExcel
+                                ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]'
+                                : 'bg-[#F4EFEA] border-[#121316] text-[#121316]'
+                            }`}>
                               {ext}
                             </span>
-                            {rot > 0 && (
-                              <span className="px-1.5 py-0.2 bg-[#1E3A8A] text-white text-[10px] font-black">
-                                {rot}°
+                            {isExcel ? (
+                              <span className="text-[10px] text-[#575A65] font-semibold">
+                                {excelOrientation === 'auto' ? '⚡ Akıllı UYAP' : excelOrientation === 'landscape' ? '↔ Yatay' : '↕ Dikey'}
                               </span>
+                            ) : (
+                              rot > 0 && (
+                                <span className="px-1.5 py-0.2 bg-[#1E3A8A] text-white text-[10px] font-black">
+                                  {rot}°
+                                </span>
+                              )
                             )}
                           </div>
                           <p className="text-xs font-bold text-[#121316] truncate" title={filePath}>
@@ -296,14 +421,16 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
 
                       {/* Right: Actions (Rotate, Move Up/Down, Remove) */}
                       <div className="flex items-center gap-1 shrink-0">
-                        {/* 90° Sağa Döndür */}
-                        <button
-                          onClick={() => rotateFile(filePath)}
-                          className="brutal-btn p-1.5 bg-[#F4EFEA] text-[#121316] hover:bg-[#121316] hover:text-white text-xs font-bold"
-                          title="90° Sağa Döndür"
-                        >
-                          <RotateCw className="w-3.5 h-3.5" />
-                        </button>
+                        {/* 90° Sağa Döndür (Yalnızca görseller için) */}
+                        {!isExcel && (
+                          <button
+                            onClick={() => rotateFile(filePath)}
+                            className="brutal-btn p-1.5 bg-[#F4EFEA] text-[#121316] hover:bg-[#121316] hover:text-white text-xs font-bold"
+                            title="90° Sağa Döndür"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
 
                         {/* Yukarı Taşı */}
                         <button

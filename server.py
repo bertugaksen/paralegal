@@ -15,6 +15,7 @@ from typing import Dict, Any
 
 import pymupdf as fitz
 from core.converter import ImageConverter
+from core.excel_converter import ExcelConverter
 from core.kvkk_detector import KVKKDetector
 from core.redactor import PDFRedactor
 
@@ -173,6 +174,15 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
 
             if file_type == "image":
                 filetypes = [("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"), ("Tüm Dosyalar", "*.*")]
+            elif file_type == "excel":
+                filetypes = [("Excel Tabloları", "*.xlsx *.xls"), ("Tüm Dosyalar", "*.*")]
+            elif file_type in ("converter", "all_supported"):
+                filetypes = [
+                    ("Dönüştürülebilir Belgeler (Excel & Görsel)", "*.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("Excel Tabloları", "*.xlsx *.xls"),
+                    ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("Tüm Dosyalar", "*.*")
+                ]
             else:
                 filetypes = [("PDF Belgeleri", "*.pdf"), ("Tüm Dosyalar", "*.*")]
 
@@ -189,8 +199,13 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
             root.withdraw()
             root.attributes("-topmost", True)
 
-            filetypes = [("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"), ("Tüm Dosyalar", "*.*")]
-            chosen = filedialog.askopenfilenames(title="Görselleri Seçin", filetypes=filetypes)
+            filetypes = [
+                ("Desteklenen Belgeler (Excel & Görseller)", "*.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                ("Excel Tabloları", "*.xlsx *.xls"),
+                ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                ("Tüm Dosyalar", "*.*")
+            ]
+            chosen = filedialog.askopenfilenames(title="Dönüştürülecek Belgeleri Seçin", filetypes=filetypes)
             root.destroy()
             self._send_json({"paths": list(chosen) if chosen else []})
             return
@@ -366,13 +381,56 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(e)}, 500)
                 return
 
-        # 8. API: Görselleri PDF'e Dönüştürme
+        # 8. API: Excel Tablo Analizi
+        if path == "/api/analyze-excel":
+            data = self._read_json()
+            excel_path = data.get("path")
+            if not excel_path or not os.path.exists(excel_path):
+                self._send_json({"error": "Excel dosyası bulunamadı"}, 404)
+                return
+            try:
+                analysis = ExcelConverter.analyze_excel(excel_path)
+                self._send_json(analysis)
+                return
+            except Exception as e:
+                self._send_json({"error": str(e)}, 500)
+                return
+
+        # 9. API: Tekil Excel Dönüştürme
+        if path == "/api/convert-excel":
+            data = self._read_json()
+            input_path = data.get("input_path")
+            output_path = data.get("output_path")
+            orientation = data.get("orientation", "auto")
+            fit_width = data.get("fit_width", True)
+            repeat_header = data.get("repeat_header", True)
+
+            if not input_path or not os.path.exists(input_path):
+                self._send_json({"error": "Excel dosyası bulunamadı"}, 404)
+                return
+
+            try:
+                res = ExcelConverter.convert_excel_to_pdf(
+                    input_path=input_path,
+                    output_path=output_path,
+                    orientation=orientation,
+                    fit_width=fit_width,
+                    repeat_header=repeat_header,
+                )
+                self._send_json({"success": True, "output_path": res})
+                return
+            except Exception as e:
+                self._send_json({"error": str(e)}, 500)
+                return
+
+        # 10. API: Belgeleri (Görseller & Excel) PDF'e Dönüştürme
         if path == "/api/convert-images":
             data = self._read_json()
             input_paths = data.get("input_paths", [])
             combine = data.get("combine", False)
             output_dir = data.get("output_dir")
             rotations = data.get("rotations", {})
+            excel_options = data.get("excel_options", {})
 
             if not input_paths:
                 self._send_json({"error": "Dosya listesi boş"}, 400)
@@ -386,16 +444,64 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
                     first_p = Path(input_paths[0])
                     combined_name = f"{first_p.stem}_birlestirilmis.pdf"
                     out_path = os.path.join(output_dir, combined_name) if output_dir else str(first_p.parent / combined_name)
-                    res = ImageConverter.combine_multiple_images_to_pdf(input_paths, out_path, rotations=rotations)
-                    results.append(res)
+
+                    # Eğer tüm dosyalar görsel ise doğrudan ImageConverter kullan
+                    all_images = all(ImageConverter.is_supported(p) for p in input_paths)
+                    if all_images:
+                        res = ImageConverter.combine_multiple_images_to_pdf(input_paths, out_path, rotations=rotations)
+                        results.append(res)
+                    else:
+                        # Hibrit birleştirme (Excel + Görseller)
+                        import tempfile
+                        import shutil
+                        temp_pdfs = []
+                        temp_dir = tempfile.mkdtemp(prefix="paralegal_hybrid_")
+                        try:
+                            for idx, p_str in enumerate(input_paths):
+                                tmp_pdf = os.path.join(temp_dir, f"doc_{idx}.pdf")
+                                if ExcelConverter.is_supported(p_str):
+                                    ExcelConverter.convert_excel_to_pdf(
+                                        p_str,
+                                        output_path=tmp_pdf,
+                                        orientation=excel_options.get("orientation", "auto"),
+                                        fit_width=excel_options.get("fit_width", True),
+                                        repeat_header=excel_options.get("repeat_header", True),
+                                    )
+                                    temp_pdfs.append(tmp_pdf)
+                                elif ImageConverter.is_supported(p_str):
+                                    rot = rotations.get(p_str, 0)
+                                    ImageConverter.convert_image_to_pdf(p_str, output_path=tmp_pdf, rotation=rot)
+                                    temp_pdfs.append(tmp_pdf)
+
+                            merged_doc = fitz.open()
+                            for t_pdf in temp_pdfs:
+                                if os.path.exists(t_pdf):
+                                    src = fitz.open(t_pdf)
+                                    merged_doc.insert_pdf(src)
+                                    src.close()
+                            merged_doc.save(out_path, garbage=4, deflate=True)
+                            merged_doc.close()
+                            results.append(out_path)
+                        finally:
+                            shutil.rmtree(temp_dir, ignore_errors=True)
                 else:
                     for p_str in input_paths:
                         p = Path(p_str)
                         out_name = f"{p.stem}.pdf"
                         out_path = os.path.join(output_dir, out_name) if output_dir else str(p.with_suffix(".pdf"))
-                        rot = rotations.get(p_str, 0)
-                        res = ImageConverter.convert_image_to_pdf(p_str, out_path, rotation=rot)
-                        results.append(res)
+                        if ExcelConverter.is_supported(p_str):
+                            res = ExcelConverter.convert_excel_to_pdf(
+                                p_str,
+                                output_path=out_path,
+                                orientation=excel_options.get("orientation", "auto"),
+                                fit_width=excel_options.get("fit_width", True),
+                                repeat_header=excel_options.get("repeat_header", True),
+                            )
+                            results.append(res)
+                        else:
+                            rot = rotations.get(p_str, 0)
+                            res = ImageConverter.convert_image_to_pdf(p_str, out_path, rotation=rot)
+                            results.append(res)
 
                 self._send_json({"success": True, "output_paths": results, "errors": errors})
                 return
