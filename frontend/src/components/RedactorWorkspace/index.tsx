@@ -22,8 +22,8 @@ import {
   Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { api } from '../api';
-import { FilterSettings, PDFMeta, RedactionItem } from '../types';
+import { api } from '../../api';
+import { FilterSettings, PDFMeta, RedactionItem } from '../../types';
 
 interface RedactorWorkspaceProps {
   onBackToHub: () => void;

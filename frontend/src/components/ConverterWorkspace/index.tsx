@@ -18,7 +18,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { api } from '../api';
+import { api } from '../../api';
 
 interface ConverterWorkspaceProps {
   onBackToHub: () => void;
