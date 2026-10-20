@@ -540,7 +540,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         zoom={zoom}
         onZoomIn={() => setZoom(Math.min(zoom + 10, 200))}
         onZoomOut={() => setZoom(Math.max(zoom - 10, 20))}
-        onFitWidth={() => {}}
+        onFitWidth={() => handleFitToWidth()}
         drawToolActive={drawToolActive}
         onToggleDrawTool={() => setDrawToolActive(!drawToolActive)}
         onSave={handleSaveRedactedPDF}

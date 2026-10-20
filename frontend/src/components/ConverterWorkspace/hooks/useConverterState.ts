@@ -10,9 +10,9 @@ export function useConverterState() {
   const [targetDirectory, setTargetDirectory] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<{
-    success?: boolean;
+    success: boolean;
     text: string;
-    paths?: string[];
+    files: string[];
   } | null>(null);
 
   return {
