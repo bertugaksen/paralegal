@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { FilterSettings, PDFMeta, RedactionItem } from '../../../types';
-import { api } from '../../../api';
 
 export const DEFAULT_FILTERS: FilterSettings = {
   names: true, companies: true, dockets: true, tckn: true,
@@ -40,6 +39,9 @@ export function useRedactorState() {
   const [normStart, setNormStart] = useState<{ x: number; y: number } | null>(null);
   const [normCurrent, setNormCurrent] = useState<{ x: number; y: number } | null>(null);
 
+  const [showZoomBadge, setShowZoomBadge] = useState<boolean>(false);
+  const zoomBadgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomRef = useRef<number>(zoom);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,7 @@ export function useRedactorState() {
     sidebarTab, setSidebarTab, dataScope, setDataScope, loadedPages, setLoadedPages,
     drawToolActive, setDrawToolActive, drawingPage, setDrawingPage,
     isDrawing, setIsDrawing, normStart, setNormStart, normCurrent, setNormCurrent,
-    pageRefs, imageRefs, containerRef, handleFitToWidth
+    showZoomBadge, setShowZoomBadge, zoomBadgeTimeoutRef, zoomRef,
+    pageRefs, imageRefs, containerRef
   };
 }

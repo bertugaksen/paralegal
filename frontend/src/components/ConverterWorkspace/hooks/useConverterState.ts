@@ -1,38 +1,29 @@
-import { useState, useCallback } from 'react';
-import { api } from '../../../api';
-import { ExcelAnalysis } from '../../../types';
-
-export interface FileItem {
-  id: string;
-  path: string;
-  name: string;
-  type: 'image' | 'excel';
-  size?: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  errorMessage?: string;
-  rotation?: number;
-  thumbnailUrl?: string;
-  excelAnalysis?: ExcelAnalysis;
-}
+import { useState } from 'react';
 
 export function useConverterState() {
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [isConverting, setIsConverting] = useState(false);
-  const [combinePdfs, setCombinePdfs] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-
-  // Excel Settings
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [rotations, setRotations] = useState<Record<string, number>>({});
+  const [combineIntoOne, setCombineIntoOne] = useState<boolean>(true);
   const [excelOrientation, setExcelOrientation] = useState<'auto' | 'landscape' | 'portrait'>('auto');
-  const [excelFitWidth, setExcelFitWidth] = useState(true);
-  const [excelRepeatHeader, setExcelRepeatHeader] = useState(true);
+  const [fitAllColumns, setFitAllColumns] = useState<boolean>(true);
+  const [repeatHeaderRow, setRepeatHeaderRow] = useState<boolean>(true);
+  const [targetDirectory, setTargetDirectory] = useState<string | null>(null);
+  const [isConverting, setIsConverting] = useState<boolean>(false);
+  const [resultMessage, setResultMessage] = useState<{
+    success?: boolean;
+    text: string;
+    paths?: string[];
+  } | null>(null);
 
   return {
-    files, setFiles,
-    isConverting, setIsConverting,
-    combinePdfs, setCombinePdfs,
-    saveStatus, setSaveStatus,
+    selectedPaths, setSelectedPaths,
+    rotations, setRotations,
+    combineIntoOne, setCombineIntoOne,
     excelOrientation, setExcelOrientation,
-    excelFitWidth, setExcelFitWidth,
-    excelRepeatHeader, setExcelRepeatHeader
+    fitAllColumns, setFitAllColumns,
+    repeatHeaderRow, setRepeatHeaderRow,
+    targetDirectory, setTargetDirectory,
+    isConverting, setIsConverting,
+    resultMessage, setResultMessage
   };
 }

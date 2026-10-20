@@ -23,79 +23,32 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../../api';
+import { useRedactorState, DEFAULT_FILTERS, CATEGORY_NAMES } from './hooks/useRedactorState';
+import { Toolbar } from './components/Toolbar';
+import { Sidebar } from './components/Sidebar';
+
 import { FilterSettings, PDFMeta, RedactionItem } from '../../types';
 
 interface RedactorWorkspaceProps {
   onBackToHub: () => void;
 }
 
-const DEFAULT_FILTERS: FilterSettings = {
-  names: true,
-  companies: true,
-  dockets: true,
-  tckn: true,
-  vkn: true,
-  iban: true,
-  phone: true,
-  plate: true,
-  email: true,
-  address: true,
-  identity: true,
-  property: true,
-};
 
-const CATEGORY_NAMES: Record<string, string> = {
-  TCKN: 'TCKN',
-  VKN: 'Vergi No',
-  TARAF_ISMI: 'Kişi Adı',
-  KISI_ADI: 'Kişi Adı',
-  SIRKET_UNVANI: 'Şirket Unvanı',
-  DOSYA_NO: 'Dosya No',
-  IBAN: 'IBAN',
-  TELEFON: 'Telefon',
-  PLAKA: 'Plaka',
-  EPOSTA: 'E-Posta',
-  ADRES: 'Adres',
-  KIMLIK_BILGISI: 'Kimlik / Aile',
-  TASINMAZ: 'Tapu / Taşınmaz',
-  OZEL_KELIME: 'Özel Arama',
-  MANUEL: 'Manuel Seçim',
-};
 
 export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHub }) => {
-  const [pdfMeta, setPdfMeta] = useState<PDFMeta | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(0);
-  const [zoom, setZoom] = useState<number>(100);
-  const [filters, setFilters] = useState<FilterSettings>(DEFAULT_FILTERS);
-  const [redactions, setRedactions] = useState<RedactionItem[]>([]);
-  const [whitelist, setWhitelist] = useState<string[]>([]);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [redactionColor, setRedactionColor] = useState<'black' | 'white'>('black');
-  const [redactionOverlay, setRedactionOverlay] = useState<'none' | 'redacted'>('none');
-  const [sidebarTab, setSidebarTab] = useState<'data' | 'settings'>('data');
-  const [dataScope, setDataScope] = useState<'current_page' | 'all_pages'>('current_page');
-  const [loadedPages, setLoadedPages] = useState<Record<number, boolean>>({});
+  const {
+    pdfMeta, setPdfMeta, currentPage, setCurrentPage, zoom, setZoom, filters, setFilters,
+    redactions, setRedactions, whitelist, setWhitelist, isScanning, setIsScanning,
+    isSaving, setIsSaving, saveStatus, setSaveStatus, searchTerm, setSearchTerm,
+    isSearching, setIsSearching, redactionColor, setRedactionColor, redactionOverlay,
+    setRedactionOverlay, sidebarTab, setSidebarTab, dataScope, setDataScope,
+    loadedPages, setLoadedPages, drawToolActive, setDrawToolActive, drawingPage,
+    setDrawingPage, isDrawing, setIsDrawing, normStart, setNormStart, normCurrent,
+    setNormCurrent, showZoomBadge, setShowZoomBadge, zoomBadgeTimeoutRef, zoomRef,
+    pageRefs, imageRefs, containerRef
+  } = useRedactorState();
 
-  // Manuel Bant Çekme Aracı Modu (Açık Araç Çubuğu Butonu)
-  const [drawToolActive, setDrawToolActive] = useState<boolean>(false);
-  const [drawingPage, setDrawingPage] = useState<number | null>(null);
-  const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [normStart, setNormStart] = useState<{ x: number; y: number } | null>(null);
-  const [normCurrent, setNormCurrent] = useState<{ x: number; y: number } | null>(null);
-
-  // Yüzen Zoom HUD Rozeti Durumu
-  const [showZoomBadge, setShowZoomBadge] = useState<boolean>(false);
-  const zoomBadgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const zoomRef = useRef<number>(zoom);
   zoomRef.current = zoom;
-
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Odaklı PDF Yakınlaştırma (Touchpad Pinch & Ctrl+Wheel)
   // Yalnızca PDF sayfasını imleç odaklı büyütür/küçültür; uygulama arayüzünü asla bozmaz.
@@ -576,147 +529,25 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
   return (
     <div className="h-screen flex flex-col bg-[#F4EFEA] text-[#121316] overflow-hidden">
       {/* Top Navigation Bar */}
-      <header className="h-16 border-b-2 border-[#121316] bg-[#FFFFFF] px-5 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBackToHub}
-            className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] hover:bg-[#121316] hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ana Menü</span>
-          </button>
-
-          <div className="h-5 w-[1.5px] bg-[#121316]/20" />
-
-          {pdfMeta ? (
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#121316]" />
-              {/* Başlık Taşmasını Önleyen max-w ve Ellipsis */}
-              <span
-                className="font-extrabold text-sm max-w-[220px] truncate cursor-help"
-                title={`Belge: ${pdfMeta.filename}\nTam Yol: ${pdfMeta.path}`}
-              >
-                {pdfMeta.filename}
-              </span>
-              <span className="text-[11px] px-2 py-0.5 bg-[#F4EFEA] border border-[#121316] font-bold">
-                {pdfMeta.total_pages} Sayfa
-              </span>
-            </div>
-          ) : (
-            <span className="font-bold text-sm text-[#575A65]">Henüz belge yüklenmedi</span>
-          )}
-        </div>
-
-        {pdfMeta && (
-          <div className="flex items-center gap-3">
-            {/* Sayfa Gezinme ve Kesintisiz Dikey Akış Kontrolü */}
-            <div className="flex items-center gap-1 bg-[#F4EFEA] border-2 border-[#121316] p-0.5 brutal-shadow-sm">
-              <button
-                disabled={currentPage <= 0}
-                onClick={() => scrollToPage(Math.max(0, currentPage - 1))}
-                className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-inherit cursor-pointer"
-                title="Önceki Sayfaya Kaydır"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => scrollToPage(currentPage)}
-                className="text-xs font-black px-2 min-w-16 text-center hover:bg-[#121316] hover:text-white transition-colors cursor-pointer"
-                title="Şu anki sayfa / Toplam sayfa (Kaydırmak için tıkla)"
-              >
-                {currentPage + 1} / {pdfMeta.total_pages}
-              </button>
-              <button
-                disabled={currentPage >= pdfMeta.total_pages - 1}
-                onClick={() => scrollToPage(Math.min(pdfMeta.total_pages - 1, currentPage + 1))}
-                className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-inherit cursor-pointer"
-                title="Sonraki Sayfaya Kaydır"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Yakınlaştırma (Zoom) */}
-            <div className="flex items-center gap-1 bg-[#F4EFEA] border-2 border-[#121316] p-0.5 brutal-shadow-sm">
-              <button
-                disabled={zoom <= 35}
-                onClick={() => {
-                  setZoom((z) => Math.max(35, z - 10));
-                  setShowZoomBadge(true);
-                  if (zoomBadgeTimeoutRef.current) clearTimeout(zoomBadgeTimeoutRef.current);
-                  zoomBadgeTimeoutRef.current = setTimeout(() => setShowZoomBadge(false), 1200);
-                }}
-                className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 cursor-pointer"
-                title="Uzaklaştır"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleToggleFitOrFull}
-                className="text-xs font-black px-1.5 min-w-12 text-center hover:bg-[#121316] hover:text-white transition-colors cursor-pointer"
-                title="Tıkla: Sığdır / %100 Geçişi"
-              >
-                %{zoom}
-              </button>
-              <button
-                disabled={zoom >= 250}
-                onClick={() => {
-                  setZoom((z) => Math.min(250, z + 10));
-                  setShowZoomBadge(true);
-                  if (zoomBadgeTimeoutRef.current) clearTimeout(zoomBadgeTimeoutRef.current);
-                  zoomBadgeTimeoutRef.current = setTimeout(() => setShowZoomBadge(false), 1200);
-                }}
-                className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 cursor-pointer"
-                title="Yakınlaştır"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleToggleFitOrFull}
-                className="px-2 py-0.5 bg-[#FFFFFF] hover:bg-[#121316] hover:text-white border border-[#121316]/50 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer ml-0.5"
-                title="Genişliğe Sığdır / %100 arasında geçiş yap"
-              >
-                Sığdır
-              </button>
-            </div>
-
-            {/* Bant Çek (Serbest Çizim) Butonu */}
-            <button
-              onClick={() => setDrawToolActive(!drawToolActive)}
-              className={`brutal-btn px-3 py-1.5 text-xs font-black flex items-center gap-1.5 transition-all ${
-                drawToolActive ? 'brutal-btn-primary' : 'bg-[#FFFFFF] text-[#121316]'
-              }`}
-              title="Belge üzerinde fareyle serbest dikdörtgen çizerek sansür alanı oluşturun"
-            >
-              <Square className="w-3.5 h-3.5" />
-              <span>{drawToolActive ? 'Bant Modu Açık' : 'Bant Çek'}</span>
-            </button>
-
-            {/* Yeniden Tara (İkincil Aksiyon: Nötr Siyah/Beyaz) */}
-            <button
-              onClick={() => pdfMeta && triggerScan(pdfMeta.path, filters, whitelist)}
-              disabled={isScanning}
-              className="brutal-btn px-3 py-1.5 bg-[#FFFFFF] text-xs font-bold flex items-center gap-1.5 hover:bg-[#F4EFEA]"
-              title="Filtrelerle Yeniden Tara"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-              <span>Yeniden Tara</span>
-            </button>
-
-            {/* Güvenli PDF Kaydet (Birincil CTA: Hukuk Laciverti #1E3A8A) */}
-            <button
-              onClick={handleSaveRedactedPDF}
-              disabled={isSaving || totalApproved === 0}
-              className="brutal-btn-primary px-4 py-1.5 text-xs font-black flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>
-                {isSaving ? 'İşleniyor...' : `Güvenli PDF Kaydet (${totalApproved})`}
-              </span>
-            </button>
-          </div>
-        )}
-      </header>
+      <Toolbar
+        onBack={onBackToHub}
+        onSelectFile={handleSelectFile}
+        pdfMeta={pdfMeta}
+        onSearch={handleSearchText}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        isSearching={isSearching}
+        zoom={zoom}
+        onZoomIn={() => setZoom(Math.min(zoom + 10, 200))}
+        onZoomOut={() => setZoom(Math.max(zoom - 10, 20))}
+        onFitWidth={() => {}}
+        drawToolActive={drawToolActive}
+        onToggleDrawTool={() => setDrawToolActive(!drawToolActive)}
+        onSave={handleSaveRedactedPDF}
+        isSaving={isSaving}
+        onToggleSidebar={() => {}}
+        sidebarVisible={true}
+      />
 
       {/* Main Workspace Area */}
       {!pdfMeta ? (
@@ -955,410 +786,34 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
           </div>
 
           {/* Right Sidebar: Controls & Entity Management */}
-          <aside className="w-96 border-l-2 border-[#121316] bg-[#FFFFFF] flex flex-col shrink-0 z-10">
-            {/* Top Segmented Tab Switcher */}
-            <div className="flex border-b-2 border-[#121316] bg-[#FFFFFF] shrink-0">
-              <button
-                onClick={() => setSidebarTab('data')}
-                className={`flex-1 py-3 px-3 text-xs font-black flex items-center justify-center gap-2 border-r-2 border-[#121316] transition-all cursor-pointer ${
-                  sidebarTab === 'data'
-                    ? 'bg-[#F4EFEA] text-[#121316] border-b-4 border-b-[#1E3A8A]'
-                    : 'bg-[#FFFFFF] text-[#575A65] hover:bg-[#F4EFEA]/50 hover:text-[#121316]'
-                }`}
-              >
-                <FileText className="w-4 h-4 text-[#1E3A8A]" />
-                <span>Bu Sayfadaki Veriler</span>
-                <span
-                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-full transition-colors ${
-                    sidebarTab === 'data'
-                      ? 'bg-[#1E3A8A] text-white'
-                      : 'bg-[#121316]/10 text-[#121316]'
-                  }`}
-                >
-                  {currentPageRedactions.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setSidebarTab('settings')}
-                className={`flex-1 py-3 px-3 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  sidebarTab === 'settings'
-                    ? 'bg-[#F4EFEA] text-[#121316] border-b-4 border-b-[#1E3A8A]'
-                    : 'bg-[#FFFFFF] text-[#575A65] hover:bg-[#F4EFEA]/50 hover:text-[#121316]'
-                }`}
-              >
-                <Sliders className="w-4 h-4 text-[#121316]" />
-                <span>Filtreler & Ayarlar</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-[#121316]/10 text-[#121316] rounded-full">
-                  {Object.values(filters).filter(Boolean).length}/12
-                </span>
-              </button>
-            </div>
-
-            {/* TAB 1: VERİ LİSTESİ (Birincil Çalışma Alanı - %85 Dikey Alan) */}
-            {sidebarTab === 'data' && (
-              <div className="flex-1 flex flex-col min-h-0 bg-white">
-                {/* Kompakt Arama Barı */}
-                <div className="p-3 border-b-2 border-[#121316] bg-[#F4EFEA] shrink-0">
-                  <form onSubmit={handleSearchText} className="flex gap-1.5">
-                    <div className="relative flex-1">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#575A65]" />
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Kişi, unvan veya kelime ara..."
-                        className="w-full pl-8 pr-2.5 py-1.5 bg-white border-2 border-[#121316] text-xs font-bold text-[#121316] focus:outline-none placeholder:text-[#575A65]"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isSearching || !searchTerm.trim()}
-                      className="brutal-btn px-3 py-1.5 bg-[#121316] text-white text-xs font-black shrink-0 hover:bg-[#1E3A8A] disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSearching ? '...' : 'Bul & Kapat'}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Toplu Eylemler ve Muafiyet Rozeti Barı */}
-                <div className="p-2 border-b-2 border-[#121316] bg-[#FFFFFF] flex items-center justify-between gap-2 shrink-0">
-                  <button
-                    onClick={approveAllAcrossDocument}
-                    className="brutal-btn flex-1 py-1.5 px-2 bg-[#F4EFEA] hover:bg-[#121316] hover:text-white text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    title="Tüm belgedeki varlıkları tek tıkla sansürlemeye dahil et"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    <span>Tümünü Sansürle</span>
-                  </button>
-                  <button
-                    onClick={unapproveAllAcrossDocument}
-                    className="brutal-btn flex-1 py-1.5 px-2 bg-[#F4EFEA] hover:bg-[#121316] hover:text-white text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    title="Tüm belgedeki onayları kaldır"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Tümünü Kaldır</span>
-                  </button>
-                  {whitelist.length > 0 && (
-                    <button
-                      onClick={() => setSidebarTab('settings')}
-                      className="text-[10px] font-black px-2 py-1.5 bg-[#F4EFEA] border-2 border-[#121316] text-[#1E3A8A] cursor-pointer hover:bg-[#1E3A8A] hover:text-white transition-colors shrink-0"
-                      title="Muaf tutulan kelimeleri görüntülemek ve düzenlemek için tıklayın"
-                    >
-                      {whitelist.length} Muaf
-                    </button>
-                  )}
-                </div>
-
-                {/* Scope Seçici: Bu Sayfa vs Tüm Belge */}
-                <div className="px-3 py-1.5 border-b border-[#121316] bg-[#F4EFEA] flex items-center justify-between text-xs font-bold shrink-0">
-                  <span className="text-[10px] font-black uppercase text-[#121316]">
-                    KAPSAM:
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setDataScope('current_page')}
-                      className={`px-2 py-0.5 text-[10px] font-black border transition-colors cursor-pointer ${
-                        dataScope === 'current_page'
-                          ? 'bg-[#121316] text-white border-[#121316]'
-                          : 'bg-[#FFFFFF] text-[#575A65] border-[#121316]/30 hover:text-[#121316]'
-                      }`}
-                      title="Yalnızca şu an görüntülenen sayfadaki verileri listele"
-                    >
-                      Sayfa {currentPage + 1} ({currentPageRedactions.length})
-                    </button>
-                    <button
-                      onClick={() => setDataScope('all_pages')}
-                      className={`px-2 py-0.5 text-[10px] font-black border transition-colors cursor-pointer ${
-                        dataScope === 'all_pages'
-                          ? 'bg-[#121316] text-white border-[#121316]'
-                          : 'bg-[#FFFFFF] text-[#575A65] border-[#121316]/30 hover:text-[#121316]'
-                      }`}
-                      title="Belgenin tamamındaki verileri listele"
-                    >
-                      Tüm Belge ({redactions.length})
-                    </button>
-                  </div>
-                </div>
-
-                {/* Genişletilmiş Dikey Veri Akışı */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {displayedRedactions.length === 0 ? (
-                    <div className="text-center py-16 px-4 text-xs text-[#575A65] font-medium flex flex-col items-center">
-                      <div className="w-12 h-12 bg-[#F4EFEA] border-2 border-[#121316] flex items-center justify-center mb-3">
-                        <FileText className="w-6 h-6 text-[#121316]" />
-                      </div>
-                      <p className="font-bold text-[#121316] mb-1">
-                        {dataScope === 'current_page'
-                          ? `Sayfa ${currentPage + 1}'de tespit edilen veri bulunmuyor.`
-                          : 'Belgede tespit edilen hassas veri bulunmuyor.'}
-                      </p>
-                      <p className="text-[11px] text-[#575A65] max-w-xs">
-                        Yukarıdaki <strong>"Bant Çek"</strong> butonuna basıp fareyle sürükleyerek istediğiniz alanı serbestçe kapatabilirsiniz.
-                      </p>
-                    </div>
-                  ) : (
-                    displayedRedactions.map((item) => {
-                      const catName = CATEGORY_NAMES[item.category] || item.category;
-
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            toggleRedaction(item.id);
-                            if (dataScope === 'all_pages') {
-                              scrollToPage(item.page_number);
-                            }
-                          }}
-                          className={`p-2.5 border-2 transition-all cursor-pointer flex items-center justify-between ${
-                            item.approved
-                              ? 'border-[#121316] bg-[#FFFFFF] brutal-shadow-sm'
-                              : 'border-dashed border-[#121316]/40 bg-[#F4EFEA] opacity-60 hover:opacity-100'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1 pr-2">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              {dataScope === 'all_pages' && (
-                                <span className="text-[9px] font-black px-1.5 py-0.2 bg-[#121316] text-[#F4EFEA] border border-[#121316]">
-                                  S.{item.page_number + 1}
-                                </span>
-                              )}
-                              <span className="text-[10px] font-black px-1.5 py-0.2 border border-[#121316] bg-[#F4EFEA] text-[#121316]">
-                                {catName}
-                              </span>
-                              <span className="text-[10px] text-[#575A65] font-bold">
-                                %{Math.round(item.confidence * 100)} Güven
-                              </span>
-                            </div>
-                            <p className="text-xs font-bold text-[#121316] truncate" title={item.value}>
-                              {item.value}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            {/* Beyaz Listeye Al (Tüm Belgede Yoksay) */}
-                            <button
-                              onClick={(e) => addToWhitelist(item.value, e)}
-                              className="p-1 hover:text-[#1E3A8A] text-[#575A65] hover:bg-[#F4EFEA] rounded cursor-pointer"
-                              title="Bu kelimeyi tüm belgede yoksay (Büro unvanı / antet için Muaf Tut)"
-                            >
-                              <ShieldOff className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Listeden Çıkar */}
-                            <button
-                              onClick={(e) => removeRedaction(item.id, e)}
-                              className="p-1 hover:text-[#121316] text-[#575A65] hover:bg-[#F4EFEA] rounded cursor-pointer"
-                              title="Bu sayfadaki alanı sil"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Onay İmi */}
-                            <div
-                              className={`w-5 h-5 flex items-center justify-center border-2 border-[#121316] ${
-                                item.approved ? 'bg-[#1E3A8A] text-white' : 'bg-white'
-                              }`}
-                            >
-                              {item.approved && <Check className="w-3.5 h-3.5" />}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: FİLTRELER & AYARLAR (Yapılandırma Alanı) */}
-            {sidebarTab === 'settings' && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-[#FFFFFF]">
-                {/* KVKK Filtreleri Grubu */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase text-[#121316] flex items-center gap-1.5">
-                      <Filter className="w-3.5 h-3.5 text-[#1E3A8A]" />
-                      <span>KVKK Algılama Filtreleri</span>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={selectAllFilters}
-                        className="text-[10px] font-black text-[#1E3A8A] hover:underline cursor-pointer"
-                      >
-                        Tümünü Seç
-                      </button>
-                      <span className="text-xs text-[#575A65]">|</span>
-                      <button
-                        onClick={deselectAllFilters}
-                        className="text-[10px] font-black text-[#575A65] hover:text-[#121316] hover:underline cursor-pointer"
-                      >
-                        Temizle
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(
-                      [
-                        ['tckn', 'TCKN'],
-                        ['vkn', 'Vergi No (VKN)'],
-                        ['names', 'Kişi İsimleri'],
-                        ['companies', 'Şirket Unvanları'],
-                        ['dockets', 'Dosya No / Esas'],
-                        ['address', 'Adres Bilgileri'],
-                        ['identity', 'Kimlik / Aile'],
-                        ['iban', 'IBAN'],
-                        ['phone', 'Telefon'],
-                        ['plate', 'Plaka'],
-                        ['property', 'Tapu / Taşınmaz'],
-                        ['email', 'E-Posta'],
-                      ] as const
-                    ).map(([key, label]) => {
-                      const isActive = filters[key];
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => toggleFilter(key)}
-                          className={`brutal-btn text-xs py-2 px-2.5 font-bold flex items-center justify-between transition-all cursor-pointer ${
-                            isActive
-                              ? 'brutal-btn-primary'
-                              : 'bg-[#F4EFEA] text-[#121316] hover:bg-[#EAE3DC]'
-                          }`}
-                        >
-                          <span>{label}</span>
-                          {isActive ? (
-                            <Check className="w-3.5 h-3.5 text-white" />
-                          ) : (
-                            <div className="w-3 h-3 border border-[#121316]/40" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (pdfMeta) {
-                        triggerScan(pdfMeta.path, filters, whitelist);
-                        setSidebarTab('data');
-                      }
-                    }}
-                    disabled={isScanning}
-                    className="w-full mt-2.5 brutal-btn py-2 bg-[#121316] text-white text-xs font-black flex items-center justify-center gap-2 hover:bg-[#1E3A8A] transition-colors cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-                    <span>{isScanning ? 'Taranıyor...' : 'Filtrelerle Yeniden Tara'}</span>
-                  </button>
-                </div>
-
-                {/* Sansür Görünüm Ayarları */}
-                <div className="pt-4 border-t-2 border-[#121316]">
-                  <span className="block text-xs font-black uppercase text-[#121316] mb-2.5">
-                    Sansür Görünüm Ayarları
-                  </span>
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      onClick={() => setRedactionColor('black')}
-                      className={`brutal-btn flex-1 py-2 px-2 text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer ${
-                        redactionColor === 'black' ? 'brutal-btn-primary' : 'bg-white text-[#121316]'
-                      }`}
-                    >
-                      <div className="w-3.5 h-3.5 bg-[#121316] border border-white" />
-                      <span>Siyah Kutu</span>
-                    </button>
-                    <button
-                      onClick={() => setRedactionColor('white')}
-                      className={`brutal-btn flex-1 py-2 px-2 text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer ${
-                        redactionColor === 'white' ? 'brutal-btn-primary' : 'bg-white text-[#121316]'
-                      }`}
-                    >
-                      <div className="w-3.5 h-3.5 bg-white border border-[#121316]" />
-                      <span>Beyaz Kutu</span>
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 mb-3">
-                    <button
-                      onClick={() => setRedactionOverlay('none')}
-                      className={`brutal-btn flex-1 py-1.5 px-2 text-xs font-bold cursor-pointer ${
-                        redactionOverlay === 'none' ? 'brutal-btn-primary' : 'bg-white text-[#121316]'
-                      }`}
-                    >
-                      Düz Dolgu
-                    </button>
-                    <button
-                      onClick={() => setRedactionOverlay('redacted')}
-                      className={`brutal-btn flex-1 py-1.5 px-2 text-xs font-bold cursor-pointer ${
-                        redactionOverlay === 'redacted' ? 'brutal-btn-primary' : 'bg-white text-[#121316]'
-                      }`}
-                    >
-                      [SANSÜRLENDİ] Metni
-                    </button>
-                  </div>
-
-                  {/* Canlı Görünüm Önizlemesi */}
-                  <div className="p-2.5 bg-[#F4EFEA] border-2 border-[#121316] flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#575A65]">Görünüm Önizleme:</span>
-                    <div
-                      className={`px-3 py-1 text-[10px] font-black uppercase border ${
-                        redactionColor === 'black'
-                          ? 'bg-[#121316] text-white border-[#121316]'
-                          : 'bg-white text-[#121316] border-[#121316]'
-                      }`}
-                    >
-                      {redactionOverlay === 'redacted' ? '[SANSÜRLENDİ]' : '█████████'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Whitelist / Muafiyetler Yönetimi */}
-                <div className="pt-4 border-t-2 border-[#121316]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase text-[#121316] flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#1E3A8A]" />
-                      <span>Muaf Tutulanlar (Beyaz Liste)</span>
-                    </span>
-                    <span className="text-[11px] font-bold text-[#575A65]">
-                      {whitelist.length} Kelime
-                    </span>
-                  </div>
-
-                  {whitelist.length === 0 ? (
-                    <p className="text-xs text-[#575A65] bg-[#F4EFEA] p-3 border-2 border-dashed border-[#121316]/30 leading-relaxed">
-                      Henüz muaf tutulan kelime yok. Veri listesindeki kalkan (🛡️) butonuna basarak büro unvanı veya vekil ismini tüm belgede sansürden muaf tutabilirsiniz.
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {whitelist.map((word) => (
-                        <div
-                          key={word}
-                          className="flex items-center justify-between p-2 bg-[#F4EFEA] border-2 border-[#121316] text-xs font-bold text-[#121316]"
-                        >
-                          <span className="truncate pr-2 font-mono">{word}</span>
-                          <button
-                            onClick={() => removeFromWhitelist(word)}
-                            className="p-1 hover:text-white hover:bg-[#121316] text-[#575A65] transition-colors cursor-pointer"
-                            title="Muafiyeti kaldır ve yeniden tara"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Status bar */}
-            {saveStatus && (
-              <div className="p-3 bg-[#FFFFFF] border-t-2 border-[#121316] text-xs font-bold text-[#121316] flex items-start gap-2 shrink-0">
-                <Check className="w-4 h-4 text-[#1E3A8A] shrink-0 mt-0.5" />
-                <span className="break-all">{saveStatus}</span>
-              </div>
-            )}
-          </aside>
+          <Sidebar
+          sidebarTab={sidebarTab}
+          setSidebarTab={setSidebarTab}
+          dataScope={dataScope}
+          setDataScope={setDataScope}
+          currentPage={currentPage}
+          pdfMeta={pdfMeta}
+          redactions={redactions}
+          whitelist={whitelist}
+          filters={filters}
+          setFilters={setFilters}
+          redactionColor={redactionColor}
+          setRedactionColor={setRedactionColor}
+          redactionOverlay={redactionOverlay}
+          setRedactionOverlay={setRedactionOverlay}
+          isScanning={isScanning}
+          onScan={() => {
+            if (pdfMeta) {
+              triggerScan(pdfMeta.path, filters, whitelist);
+            }
+          }}
+          onSelectDirectory={() => api.chooseDirectory().then((res) => { if (res) api.openDirectory(res); })}
+          saveStatus={saveStatus}
+          toggleRedactionApproval={toggleRedaction}
+          removeRedaction={(id) => removeRedaction(id, {} as any)}
+          addToWhitelist={(val) => addToWhitelist(val, {} as any)}
+          removeFromWhitelist={removeFromWhitelist}
+        />
         </div>
       )}
     </div>
