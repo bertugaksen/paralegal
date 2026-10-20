@@ -38,6 +38,24 @@ export const api = {
     return data.path;
   },
 
+  async chooseDirectory(): Promise<string | null> {
+    const res = await fetch(`${API_BASE}/api/choose-directory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    return data.path;
+  },
+
+  async openDirectory(path: string): Promise<void> {
+    await fetch(`${API_BASE}/api/open-directory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+  },
+
   async loadPDF(pdfPath: string): Promise<PDFMeta> {
     const res = await fetch(`${API_BASE}/api/load-pdf`, {
       method: 'POST',

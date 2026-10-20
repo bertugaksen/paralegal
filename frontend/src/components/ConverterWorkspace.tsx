@@ -31,6 +31,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
   const [excelOrientation, setExcelOrientation] = useState<'auto' | 'landscape' | 'portrait'>('auto');
   const [fitAllColumns, setFitAllColumns] = useState<boolean>(true);
   const [repeatHeaderRow, setRepeatHeaderRow] = useState<boolean>(true);
+  const [targetDirectory, setTargetDirectory] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<{
     success: boolean;
@@ -104,6 +105,23 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
   const handleConvert = async () => {
     if (selectedPaths.length === 0) return;
 
+    // Hedef kayıt klasörü: Kullanıcı önceden belirlemediyse sor
+    let chosenDir = targetDirectory;
+    if (!chosenDir) {
+      try {
+        chosenDir = await api.chooseDirectory();
+      } catch (err: any) {
+        alert(`Klasör seçimi başarısız: ${err.message}`);
+        return;
+      }
+
+      // Kullanıcı klasör seçim penceresini kapattı veya iptal ettiyse devam etme
+      if (!chosenDir) {
+        return;
+      }
+      setTargetDirectory(chosenDir);
+    }
+
     setIsConverting(true);
     setResultMessage(null);
 
@@ -112,7 +130,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
         selectedPaths,
         combineIntoOne,
         rotations,
-        undefined,
+        chosenDir,
         {
           orientation: excelOrientation,
           fit_width: fitAllColumns,
@@ -253,6 +271,54 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               </div>
             </div>
 
+            {/* Kayıt Klasörü Seçim Kartı */}
+            <div className="brutal-card p-4 bg-[#FFFFFF] border-2 border-[#121316] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 bg-[#F4EFEA] border-2 border-[#121316] flex items-center justify-center shrink-0">
+                  <FolderOpen className="w-4 h-4 text-[#1E3A8A]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-black uppercase text-[#121316] block">
+                    Kayıt Edilecek Klasör / Dizin
+                  </span>
+                  <p className="text-xs text-[#575A65] font-medium truncate" title={targetDirectory || 'Henüz seçilmedi'}>
+                    {targetDirectory ? (
+                      <span className="font-mono text-[#121316] font-bold">{targetDirectory}</span>
+                    ) : (
+                      <span className="italic text-[#575A65]">Kayıt klasörü belirlenmedi (PDF Kaydet butonuna tıklandığında sorulacaktır)</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const dir = await api.chooseDirectory();
+                      if (dir) setTargetDirectory(dir);
+                    } catch (err: any) {
+                      alert(`Klasör seçimi başarısız: ${err.message}`);
+                    }
+                  }}
+                  className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] text-xs font-bold text-[#121316] hover:bg-[#121316] hover:text-white transition-colors flex items-center gap-1.5"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>{targetDirectory ? 'Klasörü Değiştir' : 'Klasör Seç'}</span>
+                </button>
+                {targetDirectory && (
+                  <button
+                    type="button"
+                    onClick={() => api.openDirectory(targetDirectory)}
+                    className="brutal-btn px-2.5 py-1.5 bg-[#F4EFEA] text-xs font-bold text-[#575A65] hover:text-[#121316] hover:bg-[#121316]/10 transition-colors"
+                    title="Klasörü Windows Gezgini'nde Aç"
+                  >
+                    Klasörü Aç
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Excel Configuration Panel (Visible when Excel files exist in queue) */}
             {hasExcelFiles && (
               <div className="brutal-card p-5 bg-[#FFFFFF] border-2 border-[#121316]">
@@ -350,13 +416,9 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                 <span className="text-xs font-black uppercase text-[#121316]">
                   Dönüştürülecek Evraklar ({selectedPaths.length})
                 </span>
-                <button
-                  onClick={handleSelectFiles}
-                  className="brutal-btn px-3 py-1 bg-[#F4EFEA] text-xs font-bold text-[#121316] hover:bg-[#121316] hover:text-white flex items-center gap-1 transition-colors"
-                >
-                  <FolderOpen className="w-3.5 h-3.5" />
-                  <span>+ Daha Fazla Ekle</span>
-                </button>
+                <span className="text-[11px] text-[#575A65] font-semibold">
+                  Sıralamayı ok butonlarıyla düzenleyebilirsiniz
+                </span>
               </div>
 
               <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
@@ -465,6 +527,21 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                   );
                 })}
               </div>
+
+              {/* Alt Sağ: + Daha Fazla Ekle Butonu */}
+              <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-[#121316]/10">
+                <span className="text-xs text-[#575A65] font-medium">
+                  Toplam {selectedPaths.length} evrak kuyrukta
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSelectFiles}
+                  className="brutal-btn px-4 py-2 bg-[#F4EFEA] text-xs font-bold text-[#121316] hover:bg-[#121316] hover:text-white flex items-center gap-1.5 transition-colors"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span>+ Daha Fazla Ekle</span>
+                </button>
+              </div>
             </div>
 
             {/* Sticky Action Dock: Hukuk Laciverti Primary CTA */}
@@ -497,25 +574,44 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                     ) : (
                       <AlertCircle className="w-5 h-5 text-[#121316] shrink-0 mt-0.5" />
                     )}
-                    <div>
-                      <h4 className="text-sm font-black text-[#121316] mb-1">
-                        {resultMessage.success ? 'Dönüştürme Tamamlandı!' : 'Hata Oluştu'}
-                      </h4>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h4 className="text-sm font-black text-[#121316]">
+                          {resultMessage.success ? 'Dönüştürme Tamamlandı!' : 'Hata Oluştu'}
+                        </h4>
+                        {resultMessage.success && targetDirectory && (
+                          <button
+                            type="button"
+                            onClick={() => api.openDirectory(targetDirectory)}
+                            className="brutal-btn px-2.5 py-1 bg-[#F4EFEA] text-xs font-bold text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white flex items-center gap-1.5 transition-colors"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span>Klasörü Aç</span>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-[#575A65] font-medium mb-3">
                         {resultMessage.text}
                       </p>
 
                       {resultMessage.files.length > 0 && (
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <span className="text-[11px] font-bold text-[#121316] block">
                             Oluşturulan Dosyalar:
                           </span>
                           {resultMessage.files.map((f) => (
                             <div
                               key={f}
-                              className="text-xs font-mono bg-[#F4EFEA] border border-[#121316] px-2 py-1 select-all"
+                              className="text-xs font-mono bg-[#F4EFEA] border border-[#121316] px-2.5 py-1.5 select-all flex items-center justify-between gap-2"
                             >
-                              {f}
+                              <span className="truncate">{f}</span>
+                              <button
+                                type="button"
+                                onClick={() => api.openDirectory(f)}
+                                className="text-[11px] text-[#1E3A8A] hover:underline font-sans font-bold shrink-0"
+                              >
+                                Konumu Aç
+                              </button>
                             </div>
                           ))}
                         </div>

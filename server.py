@@ -231,6 +231,35 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
             self._send_json({"path": chosen if chosen else None})
             return
 
+        # 3b. API: Kayıt Klasörü Seçimi (Directory / Folder Picker)
+        if path == "/api/choose-directory":
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+
+            chosen = filedialog.askdirectory(title="PDF'lerin Kaydedileceği Klasörü Seçin")
+            root.destroy()
+            self._send_json({"path": chosen if chosen else None})
+            return
+
+        # 3c. API: Klasörü veya Dosya Konumunu Windows Gezgini'nde Aç
+        if path == "/api/open-directory":
+            data = self._read_json()
+            dir_path = data.get("path")
+            if dir_path and os.path.exists(dir_path):
+                import subprocess
+                target = os.path.normpath(dir_path)
+                if os.path.isdir(target):
+                    subprocess.Popen(["explorer.exe", target])
+                else:
+                    subprocess.Popen(["explorer.exe", "/select,", target])
+                self._send_json({"success": True})
+            else:
+                self._send_json({"error": "Dizin bulunamadı"}, 404)
+            return
+
         # 4. API: PDF Bilgilerini Yükle
         if path == "/api/load-pdf":
             data = self._read_json()

@@ -9,7 +9,7 @@ export const App: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('hub');
 
   return (
-    <div className="w-screen h-screen bg-[#F4EFEA] text-[#121316] overflow-hidden select-none">
+    <div className="w-full h-full min-h-screen bg-[#F4EFEA] text-[#121316] overflow-x-hidden overflow-y-auto select-none">
       <AnimatePresence mode="wait">
         {mode === 'hub' && (
           <motion.div
@@ -18,7 +18,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full h-full"
+            className="w-full min-h-full flex flex-col"
           >
             <LandingHub onSelectMode={setMode} />
           </motion.div>
@@ -31,7 +31,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full h-full"
+            className="w-full min-h-full flex flex-col"
           >
             <RedactorWorkspace onBackToHub={() => setMode('hub')} />
           </motion.div>
@@ -44,7 +44,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full h-full"
+            className="w-full min-h-full flex flex-col"
           >
             <ConverterWorkspace onBackToHub={() => setMode('hub')} />
           </motion.div>

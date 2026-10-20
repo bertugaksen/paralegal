@@ -65,8 +65,6 @@ def run_desktop_app():
         def __init__(self, target_url: str):
             super().__init__()
             self.setWindowTitle("Paralegal - Yerel Hukuk Teknolojisi")
-            self.resize(1340, 840)
-            self.setMinimumSize(1080, 680)
 
             if icon_path.exists():
                 self.setWindowIcon(app_icon)
@@ -81,13 +79,22 @@ def run_desktop_app():
             settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, True)
 
-            # Ekranı ortala
+            # Farklı ekran çözünürlüklerine ve Windows DPI ölçeklemesine (%100, %125, %150) tam adaptasyon
             screen = app.primaryScreen()
             if screen:
-                geo = screen.geometry()
-                x = (geo.width() - self.width()) // 2
-                y = (geo.height() - self.height()) // 2
-                self.move(max(0, x), max(0, y))
+                avail = screen.availableGeometry()
+                # Kullanılabilir ekran alanına göre orantılı akıllı boyutlandırma (görev çubuğunu taşmaz)
+                target_w = min(1340, max(850, int(avail.width() * 0.94)))
+                target_h = min(840, max(560, int(avail.height() * 0.90)))
+                self.resize(target_w, target_h)
+                self.setMinimumSize(min(800, avail.width()), min(520, avail.height()))
+
+                x = avail.x() + (avail.width() - self.width()) // 2
+                y = avail.y() + (avail.height() - self.height()) // 2
+                self.move(max(avail.x(), x), max(avail.y(), y))
+            else:
+                self.resize(1200, 750)
+                self.setMinimumSize(800, 520)
 
             self.web_view.load(QUrl(target_url))
 
