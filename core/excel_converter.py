@@ -235,6 +235,14 @@ class ExcelConverter:
 
                     if progress_callback:
                         progress_callback(4, 4, "Dönüştürme başarıyla tamamlandı.")
+
+                    # UYAP 10 MB Dosya Boyutu Koruması
+                    try:
+                        from core.redactor import PDFRedactor
+                        PDFRedactor.optimize_for_uyap_if_needed(output_path)
+                    except Exception:
+                        pass
+
                     return output_path
 
             except Exception as e:
@@ -344,4 +352,12 @@ class ExcelConverter:
         )
 
         doc.build([table])
+
+        # UYAP 10 MB Dosya Boyutu Koruması
+        try:
+            from core.redactor import PDFRedactor
+            PDFRedactor.optimize_for_uyap_if_needed(output_path)
+        except Exception:
+            pass
+
         return output_path

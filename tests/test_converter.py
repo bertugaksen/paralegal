@@ -186,3 +186,22 @@ class TestImageConverter:
         out_pdf = str(tmp_path / "out.pdf")
         with pytest.raises(RuntimeError, match="hiçbir sayfa|geçerli bir görsel sayfası çıkarılamadı"):
             ImageConverter.combine_multiple_images_to_pdf([f1, f2], out_pdf)
+
+    def test_converted_pdf_uyap_optimization(self, tmp_path):
+        """Converted PDFs are checked under UYAP 10MB limit and compressed if threshold exceeded."""
+        from PIL import Image
+        from core.redactor import PDFRedactor
+
+        large_img_path = str(tmp_path / "large_scan.png")
+        img = Image.new("RGB", (1400, 1800), color=(100, 150, 200))
+        img.save(large_img_path, format="PNG")
+
+        out_pdf = str(tmp_path / "converted_scan.pdf")
+        ImageConverter.convert_image_to_pdf(large_img_path, out_pdf)
+        assert os.path.exists(out_pdf)
+        assert os.path.getsize(out_pdf) <= 10 * 1024 * 1024
+
+        current_size = os.path.getsize(out_pdf)
+        opt_res = PDFRedactor.optimize_for_uyap_if_needed(out_pdf, max_bytes=current_size // 2)
+        assert opt_res["optimized"] is True
+        assert opt_res["final_size"] < current_size

@@ -266,6 +266,11 @@ class RouteHandler:
                                 src.close()
                         merged_doc.save(out_path, garbage=4, deflate=True)
                         merged_doc.close()
+                        try:
+                            from core.redactor import PDFRedactor
+                            PDFRedactor.optimize_for_uyap_if_needed(out_path)
+                        except Exception:
+                            pass
                         results.append(out_path)
                     finally:
                         shutil.rmtree(temp_dir, ignore_errors=True)

@@ -101,6 +101,13 @@ class ImageConverter:
                 quality=92,
             )
 
+            # UYAP 10 MB Dosya Boyutu Koruması
+            try:
+                from core.redactor import PDFRedactor
+                PDFRedactor.optimize_for_uyap_if_needed(output_path)
+            except Exception:
+                pass
+
             return output_path
 
         finally:
@@ -166,6 +173,13 @@ class ImageConverter:
                 append_images=other_pages,
                 quality=92,
             )
+
+            # UYAP 10 MB Dosya Boyutu Koruması
+            try:
+                from core.redactor import PDFRedactor
+                PDFRedactor.optimize_for_uyap_if_needed(output_path)
+            except Exception:
+                pass
 
             return output_path
 
