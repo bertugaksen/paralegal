@@ -65,23 +65,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <span>Ana Menü</span>
         </button>
 
-        <div className="h-5 w-[1.5px] bg-[#121316]/20" />
-
-        {pdfMeta ? (
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#121316]" />
-            <span
-              className="font-extrabold text-sm max-w-[220px] truncate cursor-help text-[#121316]"
-              title={`Belge: ${pdfMeta.filename}\nTam Yol: ${pdfMeta.path}`}
-            >
-              {pdfMeta.filename}
-            </span>
-            <span className="text-[11px] px-2 py-0.5 bg-[#F4EFEA] border border-[#121316] font-bold text-[#121316]">
-              {pdfMeta.total_pages} Sayfa
-            </span>
-          </div>
-        ) : (
-          <span className="font-bold text-sm text-[#575A65]">Henüz belge yüklenmedi</span>
+        {pdfMeta && (
+          <>
+            <div className="h-5 w-[1.5px] bg-[#121316]/20" />
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#121316]" />
+              <span
+                className="font-extrabold text-sm max-w-[220px] truncate cursor-help text-[#121316]"
+                title={`Belge: ${pdfMeta.filename}\nTam Yol: ${pdfMeta.path}`}
+              >
+                {pdfMeta.filename}
+              </span>
+              <span className="text-[11px] px-2 py-0.5 bg-[#F4EFEA] border border-[#121316] font-bold text-[#121316]">
+                {pdfMeta.total_pages} Sayfa
+              </span>
+            </div>
+          </>
         )}
       </div>
 
