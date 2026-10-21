@@ -83,18 +83,19 @@ def run_desktop_app():
             screen = app.primaryScreen()
             if screen:
                 avail = screen.availableGeometry()
-                # Kullanılabilir ekran alanına göre orantılı akıllı boyutlandırma (görev çubuğunu taşmaz)
-                target_w = min(1340, max(850, int(avail.width() * 0.94)))
-                target_h = min(840, max(560, int(avail.height() * 0.90)))
+                # Açılışta ferah ve kompakt masaüstü pencere boyutu (Ekranın tamamını kaplamaz)
+                target_w = min(1080, max(850, int(avail.width() * 0.72)))
+                target_h = min(680, max(560, int(avail.height() * 0.72)))
                 self.resize(target_w, target_h)
-                self.setMinimumSize(min(800, avail.width()), min(520, avail.height()))
+                self.setMinimumSize(min(850, avail.width()), min(540, avail.height()))
 
+                # Ekranın tam ortasında aç
                 x = avail.x() + (avail.width() - self.width()) // 2
                 y = avail.y() + (avail.height() - self.height()) // 2
                 self.move(max(avail.x(), x), max(avail.y(), y))
             else:
-                self.resize(1200, 750)
-                self.setMinimumSize(800, 520)
+                self.resize(1080, 680)
+                self.setMinimumSize(850, 540)
 
             self.web_view.load(QUrl(target_url))
 
