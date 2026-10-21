@@ -26,7 +26,7 @@ class KVKKEntity:
     page_number: int        # Sayfa numarası (0-tabanlı)
     rect: Tuple[float, float, float, float]  # (x0, y0, x1, y1) PDF koordinatları
     confidence: float       # 0.0 - 1.0 güven skoru
-    approved: bool = True   # Kullanıcı tarafından sansürlenmesi onaylandı mı?
+    approved: bool = False  # Avukat onayı (Varsayılan olarak false, avukat tek tek veya topluca onaylar)
 
 
 # Türkçe Büyük Harf Karakter Dönüşüm Tablosu
@@ -628,7 +628,7 @@ class KVKKDetector:
                         page_number=page_index,
                         rect=(r.x0, r.y0, r.x1, r.y1),
                         confidence=ent["confidence"],
-                        approved=True,
+                        approved=False,
                     )
                 )
 

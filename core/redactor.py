@@ -106,9 +106,14 @@ class PDFRedactor:
             output_pdf_path,
             garbage=4,
             deflate=True,
+            deflate_images=True,
+            deflate_fonts=True,
             clean=True,
         )
         doc.close()
+
+        # UYAP 10 MB Dosya Boyutu Koruması
+        uyap_opt = cls.optimize_for_uyap_if_needed(output_pdf_path)
 
         # Doğrulama: Kaydedilen dosyada metin katmanının gerçekten temizlendiğini kontrol et
         verification = cls.verify_redacted_pdf(
@@ -122,6 +127,117 @@ class PDFRedactor:
             "total_redactions": total_applied,
             "verification_passed": verification["all_cleared"],
             "leaked_words": verification["leaked_words"],
+            "uyap_optimized": uyap_opt.get("optimized", False),
+            "file_size": uyap_opt.get("final_size", os.path.getsize(output_pdf_path) if os.path.exists(output_pdf_path) else 0),
+            "under_uyap_limit": uyap_opt.get("under_uyap_limit", True),
+        }
+
+    UYAP_MAX_BYTES = 10 * 1024 * 1024  # 10 MB UYAP yükleme sınırı
+
+    @classmethod
+    def optimize_for_uyap_if_needed(cls, pdf_path: str, max_bytes: int = UYAP_MAX_BYTES) -> Dict[str, Any]:
+        """
+        Eğer üretilen PDF dosyası UYAP'ın 10 MB sınırını aşıyorsa,
+        metin okunabilirliğini ve adli netliğini bozmadan görselleri
+        kademeli olarak optimize edip boyutu 10 MB altına çeker.
+        """
+        if not os.path.exists(pdf_path):
+            return {"optimized": False, "final_size": 0, "under_uyap_limit": True}
+
+        initial_size = os.path.getsize(pdf_path)
+        if initial_size <= max_bytes:
+            return {
+                "optimized": False,
+                "original_size": initial_size,
+                "final_size": initial_size,
+                "under_uyap_limit": True,
+            }
+
+        temp_opt_path = pdf_path + ".uyap_tmp.pdf"
+        current_size = initial_size
+
+        for quality, max_dim in [(80, 1800), (70, 1500), (60, 1200)]:
+            try:
+                import io
+                from PIL import Image
+                import shutil
+
+                doc = fitz.open(pdf_path)
+                processed_xrefs = set()
+                modified = False
+
+                for page in doc:
+                    for img_info in page.get_images():
+                        xref = img_info[0]
+                        if xref in processed_xrefs:
+                            continue
+                        processed_xrefs.add(xref)
+
+                        try:
+                            base_image = doc.extract_image(xref)
+                            if not base_image or "image" not in base_image:
+                                continue
+
+                            pil_img = Image.open(io.BytesIO(base_image["image"]))
+
+                            w, h = pil_img.size
+                            if max(w, h) > max_dim:
+                                scale = max_dim / float(max(w, h))
+                                new_size = (int(w * scale), int(h * scale))
+                                pil_img = pil_img.resize(new_size, Image.Resampling.LANCZOS)
+
+                            if pil_img.mode in ("RGBA", "P"):
+                                bg = Image.new("RGB", pil_img.size, (255, 255, 255))
+                                if pil_img.mode == "RGBA":
+                                    bg.paste(pil_img, mask=pil_img.split()[3])
+                                else:
+                                    bg.paste(pil_img)
+                                pil_img = bg
+                            elif pil_img.mode != "RGB":
+                                pil_img = pil_img.convert("RGB")
+
+                            out_buf = io.BytesIO()
+                            pil_img.save(out_buf, format="JPEG", quality=quality, optimize=True)
+                            page.replace_image(xref, stream=out_buf.getvalue())
+                            modified = True
+                        except Exception:
+                            continue
+
+                if modified:
+                    doc.save(
+                        temp_opt_path,
+                        garbage=4,
+                        deflate=True,
+                        deflate_images=True,
+                        deflate_fonts=True,
+                        clean=True,
+                    )
+                    doc.close()
+
+                    new_size = os.path.getsize(temp_opt_path)
+                    if new_size < current_size:
+                        shutil.move(temp_opt_path, pdf_path)
+                        current_size = new_size
+
+                    if current_size <= max_bytes:
+                        break
+                else:
+                    doc.close()
+                    break
+            except Exception:
+                break
+            finally:
+                if os.path.exists(temp_opt_path):
+                    try:
+                        os.remove(temp_opt_path)
+                    except OSError:
+                        pass
+
+        return {
+            "optimized": current_size < initial_size,
+            "original_size": initial_size,
+            "final_size": current_size,
+            "under_uyap_limit": current_size <= max_bytes,
         }
 
     @classmethod

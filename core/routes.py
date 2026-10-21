@@ -156,7 +156,7 @@ class RouteHandler:
                     all_entities.append({
                         "id": f"{page_idx}_{round(e.rect[0])}_{round(e.rect[1])}",
                         "category": e.category, "value": e.value, "page_number": e.page_number,
-                        "rect": [e.rect[0], e.rect[1], e.rect[2], e.rect[3]], "confidence": e.confidence, "approved": True
+                        "rect": [e.rect[0], e.rect[1], e.rect[2], e.rect[3]], "confidence": e.confidence, "approved": e.approved
                     })
             doc.close()
             self.server._send_json({"entities": all_entities, "total": len(all_entities)})
