@@ -1,122 +1,196 @@
 import React from 'react';
-import { ArrowLeft, Upload, FileText, Search, ZoomOut, ZoomIn, Square, Save, Filter, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Save,
+  Square,
+  RefreshCw
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { PDFMeta } from '../../../types';
 
 interface ToolbarProps {
-  onBack: () => void;
-  onSelectFile: () => void;
+  onBackToHub: () => void;
   pdfMeta: PDFMeta | null;
-  onSearch: (term: string) => void;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  isSearching: boolean;
+  currentPage: number;
+  totalApproved: number;
   zoom: number;
+  isScanning: boolean;
+  isSaving: boolean;
+  drawToolActive: boolean;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+  onScrollToCurrentPage: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onFitWidth: () => void;
-  drawToolActive: boolean;
+  onToggleFitOrFull: () => void;
   onToggleDrawTool: () => void;
+  onRescan: () => void;
   onSave: () => void;
-  isSaving: boolean;
-  onToggleSidebar: () => void;
-  sidebarVisible: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
-  onBack, onSelectFile, pdfMeta, onSearch, searchTerm, setSearchTerm,
-  isSearching, zoom, onZoomIn, onZoomOut, onFitWidth,
-  drawToolActive, onToggleDrawTool, onSave, isSaving,
-  onToggleSidebar, sidebarVisible
+  onBackToHub,
+  pdfMeta,
+  currentPage,
+  totalApproved,
+  zoom,
+  isScanning,
+  isSaving,
+  drawToolActive,
+  onPrevPage,
+  onNextPage,
+  onScrollToCurrentPage,
+  onZoomIn,
+  onZoomOut,
+  onToggleFitOrFull,
+  onToggleDrawTool,
+  onRescan,
+  onSave,
 }) => {
   return (
-    <header className="h-[72px] bg-white border-b-2 border-[#121316] flex items-center justify-between px-6 shrink-0 relative z-20">
+    <header className="h-16 border-b-2 border-[#121316] bg-[#FFFFFF] px-5 flex items-center justify-between shrink-0 z-20">
+      {/* Sol Bölüm: Geri Dönüş ve Belge Bilgi Hapı */}
       <div className="flex items-center gap-4">
         <button
-          onClick={onBack}
-          className="p-2 hover:bg-[#F4EFEA] text-[#121316] transition-colors border-2 border-transparent hover:border-[#121316] cursor-pointer"
+          onClick={onBackToHub}
+          className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] hover:bg-[#121316] hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
           title="Ana Menüye Dön"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4" />
+          <span>Ana Menü</span>
         </button>
-        <div className="h-8 w-0.5 bg-[#121316]/10"></div>
-        <button
-          onClick={onSelectFile}
-          className="flex items-center gap-2 px-4 py-2 bg-[#121316] text-white hover:bg-[#1E3A8A] transition-colors cursor-pointer"
-        >
-          <Upload className="w-4 h-4" />
-          <span className="text-sm font-bold tracking-wide">Belge Seç</span>
-        </button>
-        {pdfMeta && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F4EFEA] border-2 border-[#121316]">
-            <FileText className="w-4 h-4 text-[#1E3A8A]" />
-            <span className="text-sm font-bold text-[#121316] max-w-[200px] truncate" title={pdfMeta.filename}>
+
+        <div className="h-5 w-[1.5px] bg-[#121316]/20" />
+
+        {pdfMeta ? (
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-[#121316]" />
+            <span
+              className="font-extrabold text-sm max-w-[220px] truncate cursor-help text-[#121316]"
+              title={`Belge: ${pdfMeta.filename}\nTam Yol: ${pdfMeta.path}`}
+            >
               {pdfMeta.filename}
             </span>
-            <span className="text-xs font-bold text-[#575A65] border-l-2 border-[#121316]/20 pl-2">
+            <span className="text-[11px] px-2 py-0.5 bg-[#F4EFEA] border border-[#121316] font-bold text-[#121316]">
               {pdfMeta.total_pages} Sayfa
             </span>
           </div>
+        ) : (
+          <span className="font-bold text-sm text-[#575A65]">Henüz belge yüklenmedi</span>
         )}
       </div>
 
-      <div className="flex items-center gap-6">
-        {pdfMeta && (
-          <form onSubmit={(e) => { e.preventDefault(); onSearch(searchTerm); }} className="flex gap-1.5">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#575A65]" />
-              <input
-                type="text"
-                placeholder="Özel kelime ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-[#F4EFEA] border-2 border-[#121316] text-sm font-bold text-[#121316] placeholder:text-[#575A65] placeholder:font-medium focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] w-64"
-              />
-            </div>
+      {/* Sağ Bölüm: Adli Kontrol ve Aksiyon Barı */}
+      {pdfMeta && (
+        <div className="flex items-center gap-3">
+          {/* 1. Sayfa Gezinme Grubu */}
+          <div className="flex items-center gap-1 bg-[#F4EFEA] border-2 border-[#121316] p-0.5 brutal-shadow-sm">
             <button
-              type="submit"
-              disabled={isSearching || !searchTerm.trim()}
-              className="px-4 py-2 bg-[#121316] text-white hover:bg-[#1E3A8A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm cursor-pointer"
+              disabled={currentPage <= 0}
+              onClick={onPrevPage}
+              className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-inherit cursor-pointer"
+              title="Önceki Sayfaya Kaydır"
             >
-              Bul
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          </form>
-        )}
+            <button
+              onClick={onScrollToCurrentPage}
+              className="text-xs font-black px-2 min-w-20 text-center hover:bg-[#121316] hover:text-white transition-colors cursor-pointer"
+              title="Şu anki sayfa / Toplam sayfa (Kaydırmak için tıkla)"
+            >
+              Sayfa {currentPage + 1} / {pdfMeta.total_pages}
+            </button>
+            <button
+              disabled={currentPage >= pdfMeta.total_pages - 1}
+              onClick={onNextPage}
+              className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-inherit cursor-pointer"
+              title="Sonraki Sayfaya Kaydır"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
 
-        <div className="flex items-center gap-1 bg-[#F4EFEA] p-1 border-2 border-[#121316]">
-          <button onClick={onZoomOut} className="p-1.5 hover:bg-white text-[#121316] transition-colors cursor-pointer"><ZoomOut className="w-4 h-4" /></button>
-          <button onClick={onFitWidth} className="px-2 text-xs font-bold text-[#121316] hover:bg-white cursor-pointer w-12 text-center" title="Sayfayı Sığdır">{Math.round(zoom)}%</button>
-          <button onClick={onZoomIn} className="p-1.5 hover:bg-white text-[#121316] transition-colors cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
-        </div>
+          {/* 2. Yakınlaştırma (Zoom) Grubu */}
+          <div className="flex items-center gap-1 bg-[#F4EFEA] border-2 border-[#121316] p-0.5 brutal-shadow-sm">
+            <button
+              disabled={zoom <= 35}
+              onClick={onZoomOut}
+              className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 cursor-pointer"
+              title="Uzaklaştır"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onToggleFitOrFull}
+              className="text-xs font-black px-1.5 min-w-12 text-center hover:bg-[#121316] hover:text-white transition-colors cursor-pointer"
+              title="Tıkla: Sığdır / %100 Geçişi"
+            >
+              %{Math.round(zoom)}
+            </button>
+            <button
+              disabled={zoom >= 250}
+              onClick={onZoomIn}
+              className="p-1 hover:bg-[#121316] hover:text-white disabled:opacity-30 cursor-pointer"
+              title="Yakınlaştır"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onToggleFitOrFull}
+              className="px-2 py-0.5 bg-[#FFFFFF] hover:bg-[#121316] hover:text-white border border-[#121316]/50 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer ml-0.5"
+              title="Genişliğe Sığdır / %100 arasında geçiş yap"
+            >
+              Sığdır
+            </button>
+          </div>
 
-        <button
-          onClick={onToggleDrawTool}
-          className={`flex items-center gap-2 px-3 py-2 border-2 transition-colors cursor-pointer ${drawToolActive ? 'bg-[#1E3A8A] border-[#1E3A8A] text-white' : 'bg-white border-[#121316] text-[#121316] hover:bg-[#F4EFEA]'}`}
-          title="Manuel Sansür Bandı Çek (Klavye Kısayolu: M)"
-        >
-          <Square className="w-4 h-4" />
-          <span className="text-sm font-bold">Alan Seç</span>
-        </button>
+          {/* 3. Bant Çek Butonu */}
+          <button
+            onClick={onToggleDrawTool}
+            className={`brutal-btn px-3 py-1.5 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              drawToolActive ? 'brutal-btn-primary' : 'bg-[#FFFFFF] text-[#121316]'
+            }`}
+            title="Belge üzerinde fareyle serbest dikdörtgen çizerek sansür alanı oluşturun"
+          >
+            <Square className="w-3.5 h-3.5" />
+            <span>{drawToolActive ? 'Bant Modu Açık' : 'Bant Çek'}</span>
+          </button>
 
-        {pdfMeta && (
+          {/* 4. Yeniden Tara (İkincil Aksiyon) */}
+          <button
+            onClick={onRescan}
+            disabled={isScanning}
+            className="brutal-btn px-3 py-1.5 bg-[#FFFFFF] text-[#121316] text-xs font-bold flex items-center gap-1.5 hover:bg-[#F4EFEA] cursor-pointer"
+            title="Filtrelerle Yeniden Tara"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+            <span>Yeniden Tara</span>
+          </button>
+
+          {/* 5. Birincil CTA: Güvenli PDF Kaydet */}
           <button
             onClick={onSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-[#121316] text-white hover:bg-[#1E3A8A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            disabled={isSaving || totalApproved === 0}
+            className="brutal-btn-primary px-4 py-1.5 text-xs font-black flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><RefreshCw className="w-4 h-4" /></motion.div> : <Save className="w-4 h-4" />}
-            <span className="text-sm font-bold tracking-wide">{isSaving ? 'İşleniyor...' : 'Kalıcı Sansürle & Kaydet'}</span>
+            {isSaving ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                <RefreshCw className="w-4 h-4" />
+              </motion.div>
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>
+              {isSaving ? 'İşleniyor...' : `Güvenli PDF Kaydet (${totalApproved})`}
+            </span>
           </button>
-        )}
-
-        <button
-          onClick={onToggleSidebar}
-          className={`p-2 transition-colors border-2 ${sidebarVisible ? 'bg-[#121316] text-white border-[#121316]' : 'bg-white text-[#121316] border-[#121316] hover:bg-[#F4EFEA]'} cursor-pointer`}
-          title="Paneli Gizle/Göster"
-        >
-          <Filter className="w-5 h-5" />
-        </button>
-      </div>
+        </div>
+      )}
     </header>
   );
 };

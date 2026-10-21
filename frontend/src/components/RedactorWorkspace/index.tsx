@@ -1,39 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
-  ArrowLeft,
   Upload,
-  FileText,
-  Search,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  Save,
-  Trash2,
-  Filter,
   FolderOpen,
-  RefreshCw,
-  Square,
-  ShieldOff,
   ShieldCheck,
-  CheckCheck,
   XCircle,
-  Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../../api';
 import { useRedactorState, DEFAULT_FILTERS, CATEGORY_NAMES } from './hooks/useRedactorState';
 import { Toolbar } from './components/Toolbar';
 import { Sidebar } from './components/Sidebar';
-
 import { FilterSettings, PDFMeta, RedactionItem } from '../../types';
 
 interface RedactorWorkspaceProps {
   onBackToHub: () => void;
 }
-
-
 
 export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHub }) => {
   const {
@@ -51,13 +32,11 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
   zoomRef.current = zoom;
 
   // Odaklı PDF Yakınlaştırma (Touchpad Pinch & Ctrl+Wheel)
-  // Yalnızca PDF sayfasını imleç odaklı büyütür/küçültür; uygulama arayüzünü asla bozmaz.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Touchpad pinch-to-zoom veya Ctrl + Wheel
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -66,24 +45,21 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         const pivotX = e.clientX - rect.left;
         const pivotY = e.clientY - rect.top;
 
-        // Touchpad küçük sürekli float üretirken (1-10), fare tekerleği 50-100 adımlarla gelir
         const isTouchpad = Math.abs(e.deltaY) < 40;
         const zoomDelta = -e.deltaY * (isTouchpad ? 0.007 : 0.0025);
 
         const currentZoom = zoomRef.current;
-        const nextZoom = Math.min(250, Math.max(50, Math.round(currentZoom * (1 + zoomDelta))));
+        const nextZoom = Math.min(250, Math.max(35, Math.round(currentZoom * (1 + zoomDelta))));
 
         if (nextZoom !== currentZoom) {
           const ratio = nextZoom / currentZoom;
           setZoom(nextZoom);
 
-          // İmleç altındaki noktanın kaymasını önle (Focal-Point Zoom Anchoring)
           requestAnimationFrame(() => {
             container.scrollLeft = (container.scrollLeft + pivotX) * ratio - pivotX;
             container.scrollTop = (container.scrollTop + pivotY) * ratio - pivotY;
           });
 
-          // Yüzen Zoom Rozetini Göster
           setShowZoomBadge(true);
           if (zoomBadgeTimeoutRef.current) clearTimeout(zoomBadgeTimeoutRef.current);
           zoomBadgeTimeoutRef.current = setTimeout(() => {
@@ -106,7 +82,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     if (!docMeta || !containerRef.current || !docMeta.pages || docMeta.pages.length === 0) return 100;
 
     const container = containerRef.current;
-    // Konteyner kullanılabilir genişliği (p-6 padding = 24px sol + 24px sağ = 48px boşluk)
     const availWidth = Math.max(200, container.clientWidth - 48);
 
     const targetIdx = Math.min(pageIdx, docMeta.pages.length - 1);
@@ -114,7 +89,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     const dpiScale = 140 / 72;
     const imgPixelWidth = page.width * dpiScale;
 
-    // Yalnızca yatay genişliği esas alarak % zoom hesapla
     const fitRatio = availWidth / imgPixelWidth;
     return Math.min(200, Math.max(35, Math.round(fitRatio * 100)));
   };
@@ -123,7 +97,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     const fitZoom = getFitWidthZoom(meta, pageIdx);
     setZoom(fitZoom);
 
-    // Scroll'u yatayda sıfırla
     requestAnimationFrame(() => {
       if (containerRef.current) {
         containerRef.current.scrollLeft = 0;
@@ -150,11 +123,9 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
   // Çift tıklama veya Sığdır butonu: Genişliğe Sığdır <-> %100 arasında pürüzsüz geçiş
   const handleToggleFitOrFull = () => {
     const fitZoom = getFitWidthZoom();
-    // Eğer şu anki zoom genişliğe sığdır değerine yakınsa (±3), %100'e geç
     if (Math.abs(zoom - fitZoom) <= 3) {
       setZoom(100);
     } else {
-      // Değilse genişliğe tam sığdır
       setZoom(fitZoom);
       requestAnimationFrame(() => {
         if (containerRef.current) {
@@ -270,7 +241,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     setIsScanning(true);
     try {
       const res = await api.scanPDF(path, currentFilters);
-      // Beyaz listedeki kelimeleri hariç tut
       const filtered = res.entities.filter((item) => {
         const val = item.value.toLowerCase().trim();
         return !currentWhitelist.some((wl) => val.includes(wl.toLowerCase().trim()));
@@ -338,7 +308,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     if (!whitelist.includes(clean)) {
       const newWl = [...whitelist, clean];
       setWhitelist(newWl);
-      // Belgedeki bu kelimeyle eşleşen tüm varlıkları kaldır
       setRedactions((prev) =>
         prev.filter((r) => !r.value.toLowerCase().includes(clean.toLowerCase()))
       );
@@ -392,7 +361,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
   };
 
   // Belirli bir sayfa görseli üzerindeki normalize koordinatı hesapla (0.0 - 1.0 arası)
-  // Zoom, CSS scale, DPI ve scroll fark etmeksizin imleç ile %100 birebir eşleşir
   const getImageCoords = (clientX: number, clientY: number, pageIdx: number) => {
     const img = imageRefs.current[pageIdx];
     if (!img) return null;
@@ -413,7 +381,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     setNormCurrent(null);
   };
 
-  // Manuel Çizim Başlangıcı (Pointer Down) - Tıklanan sayfaya özel (Yalnızca Sol Tık)
+  // Manuel Çizim Başlangıcı (Pointer Down)
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>, pageIdx: number) => {
     if (!drawToolActive || e.button !== 0) return;
     const coords = getImageCoords(e.clientX, e.clientY, pageIdx);
@@ -454,7 +422,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
       const pdfX1 = Math.max(normStart.x, normCurrent.x) * pageInfo.width;
       const pdfY1 = Math.max(normStart.y, normCurrent.y) * pageInfo.height;
 
-      // Minimum 4x4 pt boyut şartı (kazara tıklamalarda boş kutu açılmasını engeller)
       if (pdfX1 - pdfX0 > 4 && pdfY1 - pdfY0 > 4) {
         const newItem: RedactionItem = {
           id: `manual_${targetPage}_${Math.round(pdfX0)}_${Math.round(pdfY0)}_${Date.now()}`,
@@ -474,7 +441,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     handlePointerCancel();
   };
 
-  // Klavye ESC Kısayolu: Çizim yapılıyorsa iptal et, yapılmıyorsa Bant Modundan çık
+  // Klavye ESC Kısayolu
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -522,31 +489,39 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     }
   };
 
-  const currentPageRedactions = redactions.filter((r) => r.page_number === currentPage);
   const totalApproved = redactions.filter((r) => r.approved).length;
-  const displayedRedactions = dataScope === 'current_page' ? currentPageRedactions : redactions;
 
   return (
     <div className="h-screen flex flex-col bg-[#F4EFEA] text-[#121316] overflow-hidden">
       {/* Top Navigation Bar */}
       <Toolbar
-        onBack={onBackToHub}
-        onSelectFile={handleSelectFile}
+        onBackToHub={onBackToHub}
         pdfMeta={pdfMeta}
-        onSearch={handleSearchText}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        isSearching={isSearching}
+        currentPage={currentPage}
+        totalApproved={totalApproved}
         zoom={zoom}
-        onZoomIn={() => setZoom(Math.min(zoom + 10, 200))}
-        onZoomOut={() => setZoom(Math.max(zoom - 10, 20))}
-        onFitWidth={() => handleFitToWidth()}
-        drawToolActive={drawToolActive}
-        onToggleDrawTool={() => setDrawToolActive(!drawToolActive)}
-        onSave={handleSaveRedactedPDF}
+        isScanning={isScanning}
         isSaving={isSaving}
-        onToggleSidebar={() => {}}
-        sidebarVisible={true}
+        drawToolActive={drawToolActive}
+        onPrevPage={() => scrollToPage(Math.max(0, currentPage - 1))}
+        onNextPage={() => scrollToPage(Math.min(pdfMeta ? pdfMeta.total_pages - 1 : 0, currentPage + 1))}
+        onScrollToCurrentPage={() => scrollToPage(currentPage)}
+        onZoomIn={() => {
+          setZoom((z) => Math.min(250, z + 10));
+          setShowZoomBadge(true);
+          if (zoomBadgeTimeoutRef.current) clearTimeout(zoomBadgeTimeoutRef.current);
+          zoomBadgeTimeoutRef.current = setTimeout(() => setShowZoomBadge(false), 1200);
+        }}
+        onZoomOut={() => {
+          setZoom((z) => Math.max(35, z - 10));
+          setShowZoomBadge(true);
+          if (zoomBadgeTimeoutRef.current) clearTimeout(zoomBadgeTimeoutRef.current);
+          zoomBadgeTimeoutRef.current = setTimeout(() => setShowZoomBadge(false), 1200);
+        }}
+        onToggleFitOrFull={handleToggleFitOrFull}
+        onToggleDrawTool={() => setDrawToolActive(!drawToolActive)}
+        onRescan={() => pdfMeta && triggerScan(pdfMeta.path, filters, whitelist)}
+        onSave={handleSaveRedactedPDF}
       />
 
       {/* Main Workspace Area */}
@@ -776,7 +751,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                   title="Genişliğe Sığdır / %100 arasında geçiş için tıklayın"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#1E3A8A]" />
-                  <span>%{zoom}</span>
+                  <span>%{Math.round(zoom)}</span>
                   <span className="text-[10px] text-[#A0A2AA] font-normal pl-1 border-l border-white/20">
                     {Math.abs(zoom - getFitWidthZoom()) <= 3 ? 'Genişliğe Sığdırıldı' : 'Sığdırmak için tıkla'}
                   </span>
@@ -787,33 +762,38 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
 
           {/* Right Sidebar: Controls & Entity Management */}
           <Sidebar
-          sidebarTab={sidebarTab}
-          setSidebarTab={setSidebarTab}
-          dataScope={dataScope}
-          setDataScope={setDataScope}
-          currentPage={currentPage}
-          pdfMeta={pdfMeta}
-          redactions={redactions}
-          whitelist={whitelist}
-          filters={filters}
-          setFilters={setFilters}
-          redactionColor={redactionColor}
-          setRedactionColor={setRedactionColor}
-          redactionOverlay={redactionOverlay}
-          setRedactionOverlay={setRedactionOverlay}
-          isScanning={isScanning}
-          onScan={() => {
-            if (pdfMeta) {
-              triggerScan(pdfMeta.path, filters, whitelist);
-            }
-          }}
-          onSelectDirectory={() => api.chooseDirectory().then((res) => { if (res) api.openDirectory(res); })}
-          saveStatus={saveStatus}
-          toggleRedactionApproval={toggleRedaction}
-          removeRedaction={(id) => removeRedaction(id, {} as any)}
-          addToWhitelist={(val) => addToWhitelist(val, {} as any)}
-          removeFromWhitelist={removeFromWhitelist}
-        />
+            sidebarTab={sidebarTab}
+            setSidebarTab={setSidebarTab}
+            dataScope={dataScope}
+            setDataScope={setDataScope}
+            currentPage={currentPage}
+            pdfMeta={pdfMeta}
+            redactions={redactions}
+            whitelist={whitelist}
+            filters={filters}
+            setFilters={setFilters}
+            redactionColor={redactionColor}
+            setRedactionColor={setRedactionColor}
+            redactionOverlay={redactionOverlay}
+            setRedactionOverlay={setRedactionOverlay}
+            isScanning={isScanning}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            isSearching={isSearching}
+            onSearch={handleSearchText}
+            onApproveAll={approveAllAcrossDocument}
+            onUnapproveAll={unapproveAllAcrossDocument}
+            onSelectAllFilters={selectAllFilters}
+            onDeselectAllFilters={deselectAllFilters}
+            onToggleFilter={toggleFilter}
+            onRescan={() => pdfMeta && triggerScan(pdfMeta.path, filters, whitelist)}
+            onToggleRedactionApproval={toggleRedaction}
+            onRemoveRedaction={removeRedaction}
+            onAddToWhitelist={addToWhitelist}
+            onRemoveFromWhitelist={removeFromWhitelist}
+            onScrollToPage={scrollToPage}
+            saveStatus={saveStatus}
+          />
         </div>
       )}
     </div>
