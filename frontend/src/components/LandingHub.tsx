@@ -48,9 +48,6 @@ export const LandingHub: React.FC<LandingHubProps> = ({ onSelectMode }) => {
           transition={{ duration: 0.25, delay: 0.08 }}
           className="text-center mb-5 sm:mb-8"
         >
-          <span className="inline-block text-[10px] sm:text-[11px] uppercase tracking-widest font-black px-2.5 sm:px-3 py-0.5 sm:py-1 bg-[#121316] text-[#F4EFEA] mb-2">
-            İŞLEM SEÇİN
-          </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-[#121316]">
             Ne yapmak istiyorsunuz?
           </h2>
