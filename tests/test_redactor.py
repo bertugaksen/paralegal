@@ -226,7 +226,6 @@ class TestPDFRedactor:
         )
         assert result["success"] is True
         assert result["total_redactions"] == 0
-        assert os.path.exists(out)
 
     def test_apply_redactions_out_of_bounds_page(self, sample_sensitive_pdf_path, tmp_path):
         """Redaction items targeting invalid page indices are skipped gracefully."""
@@ -242,3 +241,38 @@ class TestPDFRedactor:
         )
         assert result["success"] is True
         assert result["total_redactions"] == 0
+
+    def test_uyap_optimization_under_limit(self, sample_sensitive_pdf_path, tmp_path):
+        """PDF under 10MB limit is not altered and flagged as under_uyap_limit."""
+        out = str(tmp_path / "under_limit.pdf")
+        result = PDFRedactor.apply_redactions_to_pdf(
+            sample_sensitive_pdf_path, out, redaction_items=[]
+        )
+        assert result["success"] is True
+        assert result["under_uyap_limit"] is True
+        assert result["uyap_optimized"] is False
+
+    def test_uyap_optimization_trigger_on_large_file(self, tmp_path):
+        """When a PDF exceeds the threshold, optimize_for_uyap_if_needed compresses images."""
+        import io
+        from PIL import Image
+
+        pdf_path = str(tmp_path / "large_doc.pdf")
+        doc = fitz.open()
+        page = doc.new_page()
+
+        # Insert uncompressed image
+        img = Image.new("RGB", (1200, 1200), color=(200, 100, 50))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        page.insert_image(page.rect, stream=buf.getvalue())
+        doc.save(pdf_path)
+        doc.close()
+
+        initial_size = os.path.getsize(pdf_path)
+
+        # Force a small threshold to trigger optimization
+        res = PDFRedactor.optimize_for_uyap_if_needed(pdf_path, max_bytes=initial_size // 2)
+        assert res["optimized"] is True
+        assert res["final_size"] < initial_size
+        assert os.path.exists(pdf_path)

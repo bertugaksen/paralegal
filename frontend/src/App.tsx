@@ -9,7 +9,13 @@ export const App: React.FC = () => {
   const [mode, setMode] = useState<WorkspaceMode>('hub');
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#F4EFEA] text-[#121316] overflow-x-hidden overflow-y-auto select-none">
+    <div
+      className={`w-full h-screen bg-[#F4EFEA] text-[#121316] select-none ${
+        mode === 'hub'
+          ? 'overflow-hidden flex flex-col'
+          : 'overflow-x-hidden overflow-y-auto'
+      }`}
+    >
       <AnimatePresence mode="wait">
         {mode === 'hub' && (
           <motion.div
@@ -18,7 +24,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full min-h-full flex flex-col"
+            className="w-full h-full flex flex-col overflow-hidden"
           >
             <LandingHub onSelectMode={setMode} />
           </motion.div>

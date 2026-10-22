@@ -86,12 +86,13 @@ def test_api_load_and_scan_pdf(api_server, tmp_path):
     })
     assert search_res["total"] >= 1
 
-    # 5. Apply Redactions
+    # 5. Apply Redactions (kullanıcı tarafından onaylanan varlıklar)
     out_pdf = str(tmp_path / "redacted_output.pdf")
+    entities_to_redact = [{**e, "approved": True} for e in scan_res["entities"][:3]]
     redact_res = post_json(f"{api_server}/api/apply-redactions", {
         "input_path": str(sample_pdf),
         "output_path": out_pdf,
-        "redactions": scan_res["entities"][:3],
+        "redactions": entities_to_redact,
         "color": "black",
         "overlay": "none"
     })

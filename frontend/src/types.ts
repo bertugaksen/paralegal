@@ -37,3 +37,9 @@ export interface FilterSettings {
   identity: boolean;
   property: boolean;
 }
+
+export interface ExcelAnalysis {
+  row_count?: number;
+  col_count?: number;
+  [key: string]: any;
+}
