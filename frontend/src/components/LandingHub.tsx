@@ -82,7 +82,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({ onSelectMode }) => {
                 Belge Anonimleştir
               </h3>
               <p className="text-xs sm:text-sm text-[#575A65] font-medium leading-relaxed mb-6">
-                Dava dilekçeleri, mahkeme kararları ve delil belgelerindeki TCKN, ad-soyad, şirket unvanları ve dosya numaralarını otomatik tespit edip kalıcı olarak sansürleyin.
+                Belgelerdeki hassas verileri otomatik tespit edip kalıcı olarak sansürleyin.
               </p>
             </div>
 
@@ -122,7 +122,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({ onSelectMode }) => {
                 Evrak & Tablo Dönüştür
               </h3>
               <p className="text-xs sm:text-sm text-[#575A65] font-medium leading-relaxed mb-6">
-                Delil niteliğindeki TIFF, JPEG, PNG taramaları ile hesaplama, ekstre ve faiz içeren Excel (.xlsx, .xls) tablolarını aslına uygun, sütun bölünmesiz UYAP PDF formatına dönüştürün.
+                Belgelerinizi herhangi bir kayıp yaşamadan ve UYAP'ın boyut sınırını aşmayacak şekilde PDF formatına dönüştürün.
               </p>
             </div>
 
