@@ -287,3 +287,192 @@ class TestKVKKPageScanning:
         prop_values = [e["value"] for e in properties]
         assert any("145 Ada" in v or "12 Parsel" in v for v in prop_values)
 
+
+class TestPatternOptimization:
+    """Agent-2 (Pattern İyileştirme Uzmanı) Doğrulama Testleri: Açgözlülük ve False-Positive Önleme."""
+
+    def test_party_header_multiple_roles_single_line(self):
+        """Aynı satırda birden fazla taraf sıfatı olduğunda açgözlülüğü önleme."""
+        text = "DAVACI : Ahmet Yılmaz  VEKİLİ : Av. Selin Arslan  DAVALI : Kaya İnşaat San. ve Tic. Ltd. Şti."
+        entities = KVKKDetector.find_entities_in_text(text)
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        companies = [e["value"] for e in entities if e["category"] == "SIRKET_UNVANI"]
+
+        assert "Ahmet Yılmaz" in names
+        assert any("Selin Arslan" in n for n in names)
+        assert any("Kaya İnşaat" in c for c in companies)
+        # Taraf rollerinin veya sonraki etiketlerin isim içerisine yapışmadığını doğrula
+        assert not any("DAVALI" in n for n in names)
+        assert not any("VEKİLİ" in n for n in names)
+
+    def test_party_header_inline_metadata_cutoff(self):
+        """Taraf adından sonra gelen TCKN, Vekili, Adres gibi devam etiketlerini kesme."""
+        text = "DAVACI: Ahmet Yılmaz vekilleri Av. Selin Arslan Adres: Barbaros Bulvarı Beşiktaş"
+        entities = KVKKDetector.find_entities_in_text(text)
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+
+        assert "Ahmet Yılmaz" in names
+        assert not any("Adres" in n for n in names)
+        assert not any("Barbaros" in n for n in names)
+
+    def test_company_boundary_cutoff(self):
+        """Şirket unvanı arkasından gelen adres/vergi dairesi kalıntılarının temizlenmesi."""
+        text = "DAVALI: Kaya İnşaat San. ve Tic. Ltd. Şti. Barbaros Bulvarı No:42 Beşiktaş/İstanbul"
+        entities = KVKKDetector.find_entities_in_text(text)
+        companies = [e["value"] for e in entities if e["category"] == "SIRKET_UNVANI"]
+
+        assert "Kaya İnşaat San. ve Tic. Ltd. Şti." in companies
+        assert not any("Barbaros Bulvarı" in c for c in companies)
+
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "Müvekkil Şirket Yetkilisi işlem yapmıştır.",
+            "Müvekkil Banka Şubesi tarafından bildirildi.",
+            "Davalı İdare Mahkemesi kararı bekleniyor.",
+            "Şüpheli Şahıs Bilgileri dosyaya eklendi.",
+        ],
+    )
+    def test_running_text_name_false_positives(self, phrase: str):
+        """'müvekkil şirket', 'müvekkil banka' gibi kurumsal terimlerin kişi adı sayılmaması."""
+        entities = KVKKDetector.find_entities_in_text(phrase)
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        assert len(names) == 0, f"False positive detected: {names}"
+
+    @pytest.mark.parametrize(
+        "heading",
+        [
+            "HUKUK MAHKEMESİ",
+            "DAVA DİLEKÇESİ",
+            "BİLİRKİŞİ RAPORU",
+            "TÜRK MİLLETİ ADINA",
+            "NÖBETÇİ ASLİYE MAHKEMESİNE",
+            "İHTİYATİ HACİZ TALEBİDİR",
+            "AVUKAT KAŞESİ",
+            "DELİL LİSTESİDİR",
+            "CEVAP DİLEKÇESİDİR",
+            "MAHKEME HEYETİ",
+            "BİLİRKİŞİ İNCELEMESİ",
+        ],
+    )
+    def test_all_caps_judicial_headings_filtered(self, heading: str):
+        """Mahkeme başlıkları, belge türleri ve hüküm ifadelerinin ALL_CAPS kişi adı sanılmaması."""
+        entities = KVKKDetector.find_entities_in_text(heading)
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        assert len(names) == 0, f"Heading falsely identified as name: {names}"
+
+    def test_all_caps_real_names_detected(self):
+        """Gerçek büyük harfli isimlerin başarıyla tespit edilmesi."""
+        text = "Dilekçeyi imzalayanlar: MEHMET CAN ÖZKAN ve FATMA ÇELİK"
+        entities = KVKKDetector.find_entities_in_text(text)
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        assert any("MEHMET CAN" in n for n in names)
+        assert any("FATMA ÇELİK" in n for n in names)
+
+# ==============================================================================
+# HUKUKİ TARAF VE ŞİRKET TESPİTİ ROBUSTNESS (DOĞRULAMA VE FALSE POSITIVE) TESTLERİ
+# ==============================================================================
+
+
+class TestKVKKFalsePositiveRejection:
+    """
+    Genel hukuki roller, kamu idareleri, resmi kurumlar ve dilekçe/evrak başlıklarının
+    kesinlikle gerçek kişi taraf ismi (TARAF_ISMI / KISI_ISMI) olarak işaretlenmediğini
+    denetleyen test grubu.
+    """
+
+    @pytest.mark.parametrize(
+        "text,forbidden_term",
+        [
+            ("Davalı: Şirket", "Şirket"),
+            ("Davacı taraf", "Davacı taraf"),
+            ("Davacı taraf", "taraf"),
+            ("Davalı idare", "Davalı idare"),
+            ("Davalı idare", "idare"),
+            ("Davalı: Davalı İdare", "Davalı İdare"),
+            ("Davacı: İflas İdaresi", "İflas İdaresi"),
+            ("Davalı: Tasfiye Memurluğu", "Tasfiye Memurluğu"),
+            ("Davalı: İstanbul Büyükşehir Belediyesi", "İstanbul Büyükşehir Belediyesi"),
+            ("Davalı: İstanbul Büyükşehir Belediyesi", "Belediyesi"),
+            ("Davacı: Ankara Valiliği İl Milli Eğitim Müdürlüğü", "Ankara Valiliği"),
+            ("Davacı: Ankara Valiliği İl Milli Eğitim Müdürlüğü", "Milli Eğitim Müdürlüğü"),
+            ("müvekkil şirket", "müvekkil şirket"),
+            ("müvekkil şirket", "şirket"),
+            ("müvekkil banka", "müvekkil banka"),
+            ("müvekkil banka", "banka"),
+            ("davalı kurum", "davalı kurum"),
+            ("davalı kurum", "kurum"),
+            ("sanık müdafii", "sanık müdafii"),
+            ("sanık müdafii", "müdafii"),
+            ("DAVA DİLEKÇESİ", "DAVA DİLEKÇESİ"),
+            ("GEREKÇELİ KARAR", "GEREKÇELİ KARAR"),
+            ("TÜRK MİLLETİ ADINA", "TÜRK MİLLETİ ADINA"),
+            ("BİLİRKİŞİ RAPORU", "BİLİRKİŞİ RAPORU"),
+        ],
+    )
+    def test_forbidden_terms_not_classified_as_party_name(self, text: str, forbidden_term: str):
+        """Genel kurum ve hukuki terimlerin TARAF_ISMI veya KISI_ISMI olarak yakalanmadığını doğrular."""
+        entities = KVKKDetector.find_entities_in_text(text)
+        party_entities = [
+            e["value"] for e in entities if e["category"] in ("TARAF_ISMI", "KISI_ISMI")
+        ]
+        assert not any(
+            forbidden_term.lower() in p.lower() for p in party_entities
+        ), f"Yasaklı ifade '{forbidden_term}' hatalı şekilde taraf ismi olarak yakalandı ('{text}'). Tespit edilenler: {party_entities}"
+
+
+class TestKVKKTruePositiveRetention:
+    """
+    Gerçek kişi isimlerinin (başlıklarda, vekillerde, mahkeme heyetinde ve metin içinde)
+    doğru şekilde TARAF_ISMI veya KISI_ISMI olarak yakalanmaya devam ettiğini denetleyen test grubu.
+    """
+
+    @pytest.mark.parametrize(
+        "text,expected_name",
+        [
+            ("DAVACI: Ahmet Yılmaz", "Ahmet Yılmaz"),
+            ("Davalı: Mehmet Demir", "Mehmet Demir"),
+            ("Sanık: Ali Veli Öztürk", "Ali Veli Öztürk"),
+            ("Davacı Vekili: Av. Selin Arslan", "Selin Arslan"),
+            ("HAKİM : Mehmet Akif ÖZTÜRK 123456", "Mehmet Akif ÖZTÜRK"),
+            ("KATİP : Fatma ÇELİK 234567", "Fatma ÇELİK"),
+            ("Borçlu Mehmet Ali Öztürk aleyhine takip", "Mehmet Ali Öztürk"),
+            ("Muvekkil Zeynep Kaya tarafindan imzalanan sozlesme", "Zeynep Kaya"),
+        ],
+    )
+    def test_actual_person_names_detected(self, text: str, expected_name: str):
+        """Gerçek şahıs ve heyet isimlerinin eksiksiz yakalandığını doğrular."""
+        entities = KVKKDetector.find_entities_in_text(text)
+        party_entities = [
+            e["value"] for e in entities if e["category"] in ("TARAF_ISMI", "KISI_ISMI")
+        ]
+        assert any(
+            expected_name in p for p in party_entities
+        ), f"Beklenen taraf ismi '{expected_name}' bulunamadı ('{text}'). Tespit edilenler: {party_entities}"
+
+
+class TestKVKKCompanyDetectionPrecision:
+    """
+    Ticari şirket ve finansal kuruluşların SIRKET_UNVANI kategorisinde doğru ve eksiksiz
+    tespit edildiğini denetleyen test grubu.
+    """
+
+    @pytest.mark.parametrize(
+        "company_text,expected_company",
+        [
+            ("Demir Tasimacilik ve Lojistik A.Ş.", "Demir Tasimacilik ve Lojistik A.Ş."),
+            ("Kaya Insaat San. ve Tic. Ltd. Şti.", "Kaya Insaat San. ve Tic. Ltd. Şti."),
+            ("Yildiz Holding", "Yildiz Holding"),
+            ("Turkiye Is Bankasi", "Turkiye Is Bankasi"),
+        ],
+    )
+    def test_company_entities_detected(self, company_text: str, expected_company: str):
+        """Şirket ve holding unvanlarının SIRKET_UNVANI olarak yakalandığını doğrular."""
+        entities = KVKKDetector.find_entities_in_text(company_text)
+        company_entities = [
+            e["value"] for e in entities if e["category"] == "SIRKET_UNVANI"
+        ]
+        assert any(
+            expected_company in c for c in company_entities
+        ), f"Beklenen şirket unvanı '{expected_company}' bulunamadı ('{company_text}'). Tespit edilenler: {company_entities}"
+

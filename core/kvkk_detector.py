@@ -26,11 +26,11 @@ class KVKKEntity:
     page_number: int        # Sayfa numarası (0-tabanlı)
     rect: Tuple[float, float, float, float]  # (x0, y0, x1, y1) PDF koordinatları
     confidence: float       # 0.0 - 1.0 güven skoru
-    approved: bool = True   # Kullanıcı tarafından sansürlenmesi onaylandı mı?
+    approved: bool = False  # Avukat onayı (Varsayılan olarak false, avukat tek tek veya topluca onaylar)
 
 
 # Türkçe Büyük Harf Karakter Dönüşüm Tablosu
-TR_UPPER_MAP = str.maketrans("iığüşöç", "IİĞÜŞÖÇ")
+TR_UPPER_MAP = str.maketrans("iığüşöç", "İIĞÜŞÖÇ")
 
 def tr_upper(text: str) -> str:
     return text.translate(TR_UPPER_MAP).upper()
@@ -117,8 +117,20 @@ class KVKKDetector:
     )
 
     PARTY_HEADER_PATTERN = re.compile(
-        rf"(?:{PARTY_ROLES_STRING})\s*[:/]\s*([^\n\r]+)",
+        rf"\b({PARTY_ROLES_STRING})\s*[:/]\s*(.+?)(?=(?:\s+(?:{PARTY_ROLES_STRING})\s*[:/])|[\n\r]|$)",
         re.IGNORECASE
+    )
+
+    # Taraf satırlarında adayın ardından gelen devam etiketleri ve sınır kesiciler
+    PARTY_CUTOFF_RE = re.compile(
+        r"(?i)\s+(?:"
+        r"T\.?C\.?(?:\s*K[iİ]ml[iİ]k)?(?:\s*No(?:su)?)?|TCKN|VKN|Verg[iİ]\s*(?:K[iİ]ml[iİ]k)?\s*No(?:su)?|"
+        r"Adres[iİ]?|[İI]kametg[aâ]h|Yerle[şs][iİ]m\s*Yer[iİ]|"
+        r"Vek[iİ]l(?:[iİ]|ler[iİ])?|Vek\.|M[üu]daf[iİ](?:[iİ]|ler[iİ])?|"
+        r"Mers[iİ]s\s*No|T[iİ]caret\s*S[iİ]c[iİ]l\s*No|S[iİ]c[iİ]l\s*No|"
+        r"Tel(?:efon)?|Gsm|Faks|Fax|E-?posta|Ema[iİ]l|"
+        r"ad[ıi]na|tems[iİ]len|vesayeten|velayeten|m[iİ]ras[çc][ıi]lar[ıi]|terekes[iİ]"
+        r")\b\s*[:.-]?"
     )
 
     # 10. Dilekçe Metni İçinde Geçen Kişi İsim Kalıpları (Özel İsim Baş Harfleri Büyük)
@@ -160,41 +172,286 @@ class KVKKDetector:
 
     # 15. Kesinlikle İsim Sayılmayacak Hukuki Terim, Hüküm Fıkrası ve Başlıklar (Stopwords)
     INSTITUTION_KEYWORDS = {
-        "MAHKEMESI", "MAHKEMESİ", "BASKANLIGI", "BAŞKANLIĞI", "HAKIMLIGI", "HAKİMLİĞİ",
-        "SAVCILIGI", "SAVCILIĞI", "MUDURLUGU", "MÜDÜRLÜĞÜ", "DAIRESI", "DAİRESİ",
-        "BAROSU", "BAKANLIGI", "BAKANLIĞI", "KOMISYONU", "KOMİSYONU", "GENEL", "KURULU",
-        "CUMHURIYET", "CUMHURİYET", "ADLIYE", "ADLİYE", "YARGITAY", "DANIŞTAY", "DANISTAY",
-        "DILEKCESI", "DİLEKÇESİ", "ZAPTI", "TUTANAGI", "TUTANAĞI", "KARAR", "HUKUK", "CEZA",
-        "TICARET", "TİCARET", "IS", "İŞ", "ICRA", "İCRA", "TÜRK", "TURK", "MILLETİ", "MILLET",
-        "ESAS", "TALEP", "NETICE", "NETİCE", "IHBAR", "İHBAR", "OLUNAN", "KONU", "KONUSU", "HUKUM",
-        "HÜKÜM", "DELIL", "DELİL", "SEBEP", "SEBEPLER", "ACIKLAMA", "AÇIKLAMA", "ACIKLAMALAR",
-        "AÇIKLAMALAR", "VEKILI", "VEKİLİ", "VEKILININ", "VEKİLİNİN", "MUSTERI", "MÜŞTERİ", "DAVA",
-        "DAVANIN", "DAVA TARIHI", "DAVA TARİHİ", "KARAR TARIHI", "KARAR TARİHİ",
-        "BABA ADI", "ANNE ADI", "DOGUM TARIHI", "DOĞUM TARİHİ", "BABA", "ANNE", "DOGUM", "DOĞUM",
-        "VERGI", "VERGİ", "ADRES", "TARIH", "TARİH", "TARIHI", "TARİHİ", "DOGUM YERI", "DOĞUM YERİ",
-        "VERGI NO", "VERGİ NO", "TC KIMLIK", "TC KİMLİK", "TCKN", "VKN", "ADRES", "IKAMETGAH",
-        "İKAMETGAH", "SONUC", "SONUÇ", "TALEP SONUCU", "DAVA KONUSU", "DAVANIN KONUSU",
-        "ASLIYE", "ASLİYE", "SULH", "AGIR CEZA", "AĞIR CEZA", "ISTINAF", "İSTİNAF", "TEMYIZ", "TEMYİZ",
-        "ITIRAZ", "İTİRAZ", "ITIRAZIN IPTALI", "İTİRAZIN İPTALİ", "ALACAK", "TAHLIYE", "TAHLİYE",
-        "TESPIT", "TESPİT", "TENZIL", "TENZİL", "KIDEM", "İHBAR TAZMINATI", "İHBAR TAZMİNATI",
-        "FAIZ", "FAİZ", "MASRAF", "VEKALET UCRETI", "VEKÂLET ÜCRETİ", "VEKALET ÜCRETİ",
-        "HARC", "HARÇ", "TEBLIGAT", "TEBLİGAT", "BILIRKISI RAPORU", "BİLİRKİŞİ RAPORU",
-        "GEREGI DUSUNULDU", "GEREĞİ DÜŞÜNÜLDÜ", "GEREKCELI KARAR", "GEREKÇELİ KARAR",
-        "TENSIP ZAPTI", "TENSİP ZAPTI", "DURUSMA GUNU", "DURUŞMA GÜNÜ", "ARABULUCULUK",
-        "SON TUTANAK", "VE TIC", "VE TİC", "SAN VE", "SAN. VE", "SAYGILARIMLA", "ARZ EDERIM",
-        "ARZ EDERİM", "HUKUKU", "KANUNU", "MADDESI", "MADDESİ", "KABULÜNE", "KABULUNE",
-        "REDDİNE", "REDDINE", "GEÇERSİZLİĞİNE", "GECERSIZLIGINE", "İADESİNE", "IADESINE",
-        "TESPİTİNE", "TESPITINE", "ÖDENMESİNE", "ODENMESINE", "ONANMASINA", "BOZULMASINA",
-        "DÜŞMESİNE", "DUSMESINE", "İŞE", "ISE", "FESHİN", "FESHIN", "FESİH", "FESIH",
-        "BÖLGE", "BOLGE", "HÜKÜM ÖZETİ", "HUKUM OZETI", "BİLGİLERİ", "BILGILERI", "DİLEKÇESİNDE",
-        "DILEKCESINDE", "BAŞVURUSU", "BASVURUSU", "TALEP ETMİŞTİR", "GÖRÜŞÜLDÜ", "HÜKMOLUNMASINA"
+        # Mahkemeler & Yargı Mercileri
+        "MAHKEME", "MAHKEMESİ", "MAHKEMESI", "MAHKEMELERİ", "MAHKEMELERI", "MAHKEMESİNE", "MAHKEMESINE",
+        "HAKİMLİK", "HAKİMLİĞİ", "HAKIMLIK", "HAKIMLIGI", "HAKİMLİĞİNE", "HAKIMLIGINE",
+        "SAVCILIK", "SAVCILIĞI", "SAVCILIK", "SAVCILIGI", "BAŞSAVCILIK", "BAŞSAVCILIĞI", "BASSAVCILIK", "BASSAVCILIGI",
+        "ADLİYE", "ADLİYESİ", "ADLIYE", "ADLIYESI", "ADALET", "SARAYI",
+        "YARGITAY", "DANIŞTAY", "DANISTAY", "SAYIŞTAY", "SAYISTAY", "ANAYASA",
+        "İSTİNAF", "ISTINAF", "TEMYİZ", "TEMYIZ", "BAM", "BİM", "BIM",
+        "BARO", "BAROSU", "BAROLAR", "HEYETİ", "HEYETI",
+
+        # Hukuk Dalları & Mahkeme Türleri
+        "HUKUK", "CEZA", "TİCARET", "TICARET", "İŞ", "IS", "İCRA", "ICRA", "İFLAS", "IFLAS",
+        "ASLİYE", "ASLIYE", "SULH", "AĞIR", "AGIR", "AİLE", "AILE", "TÜKETİCİ", "TUKETICI",
+        "KADASTRO", "İNFAZ", "INFAZ", "FİKRİ", "FIKRI", "SINAİ", "SINAI", "ÇOCUK", "COCUK",
+        "VERGİ", "VERGI", "İDARE", "IDARE", "İDARESİ", "IDARESI", "İDARİ", "IDARI",
+        "BÖLGE", "BOLGE", "NÖBETÇİ", "NOBETCI",
+
+        # Belge Türleri & Bölümleri
+        "DİLEKÇE", "DİLEKÇESİ", "DILEKCE", "DILEKCESI", "DILEKCESINDE", "DİLEKÇESİNDE", "DİLEKÇESİDİR", "DILEKCESIDIR",
+        "RAPOR", "RAPORU", "RAPORUDUR", "İNCELEMESİ", "INCELEMESI",
+        "TUTANAK", "TUTANAĞI", "TUTANAGI", "ZAPIT", "ZAPTI",
+        "TENSİP", "TENSIP", "DURUŞMA", "DURUSMA", "GÜNÜ", "GUNU",
+        "KARAR", "KARARI", "GEREKÇELİ", "GEREKCELI", "İLAM", "ILAM", "İLAMI", "ILAMI",
+        "MÜZEKKERE", "MUZEKKERE", "TEBLİGAT", "TEBLIGAT", "BEYAN", "BEYANI", "BEYANIDIR",
+        "CEVAP", "CEVABI", "CEVABIDIR", "İTİRAZ", "ITIRAZ", "TALEP", "TALEBİ", "TALEBI", "TALEBİDİR", "TALEBIDIR",
+        "PROTOKOL", "PROTOKOLÜ", "PROTOKOLU", "SÖZLEŞME", "SOZLESME", "SÖZLEŞMESİ", "SOZLESMESI",
+        "VEKÂLETNAME", "VEKALETNAME", "SURET", "SURETİ", "SURETI", "YETKİ", "YETKISI", "YETKİSİ",
+        "BELGE", "BELGESİ", "BELGESI", "BİLGİ", "BİLGİLERİ", "BILGI", "BILGILERI", "LİSTE", "LİSTESİ", "LİSTESİDİR", "LISTE", "LISTESI", "LISTESIDIR",
+
+        # Dilekçe & Hüküm Başlıkları ve Terimleri
+        "TÜRK", "TURK", "MİLLETİ", "MILLETİ", "MILLET", "ADINA",
+        "ESAS", "NO", "NUMARA", "NUMARASI", "KONU", "KONUSU",
+        "HÜKÜM", "HUKUM", "FIKRA", "FIKRASI", "NETİCE", "NETICE", "SONUÇ", "SONUC", "SONUCU",
+        "GEREĞİ", "GEREGI", "DÜŞÜNÜLDÜ", "DUSUNULDU",
+        "DELİL", "DELIL", "DELİLLER", "DELILLER", "DELİLLERİ", "DELILLERI",
+        "SEBEP", "SEBEPLER", "SEBEPLERİ", "AÇIKLAMA", "ACIKLAMA", "AÇIKLAMALAR", "ACIKLAMALAR",
+        "SAVUNMA", "İDDİA", "IDDIA", "ÖZETİ", "OZETI",
+
+        # Hukuki Talepler & Kavramlar
+        "TAZMİNAT", "TAZMINAT", "TAZMİNATI", "TAZMINATI", "KIDEM", "İHBAR", "IHBAR",
+        "FAİZ", "FAIZ", "FAİZİ", "FAIZI", "YASAL", "TEMERRÜT", "TEMERRUT",
+        "MASRAF", "MASRAFI", "MASRAFLARI", "HARÇ", "HARC", "HARCI",
+        "VEKALET", "VEKÂLET", "ÜCRET", "ÜCRETİ", "UCRET", "UCRETI",
+        "ALACAK", "BORÇ", "BORC", "TAHLİYE", "TAHLIYE", "TESPİT", "TESPIT", "TESPİTİ", "TESPITINE",
+        "İPTAL", "IPTAL", "İPTALİ", "IPTALI", "HACİZ", "HACIZ", "HACZİ", "HACZI", "İHTİYATİ", "IHTIYATI",
+        "İPOTEK", "IPOTEK", "REHİN", "REHIN", "İHALE", "IHALE",
+        "KONKORDATO", "TASFİYE", "TASFIYE", "MÜTEVEFFA", "MUTEVEFFA", "MURİS", "MURIS", "TEREKE", "TEREKESİ",
+        "MİRAS", "MIRAS", "MİRASÇI", "MIRASCI", "MİRASÇILARI", "MIRASCILARI",
+        "FESİH", "FESIH", "FESHİ", "FESHI", "FESHİN", "FESHIN",
+
+        # Kurum, Şirket ve Statü Kelimeleri (Tek başına veya unvanda geçen)
+        "ŞİRKET", "SIRKET", "ŞİRKETİ", "SIRKETI", "ŞİRKETİN", "SIRKETIN",
+        "ANONİM", "ANONIM", "LİMİTED", "LIMITED", "ORTAKLIK", "ORTAKLIĞI", "ORTAKLIGI",
+        "HOLDİNG", "HOLDING", "BANKA", "BANKASI", "BANKASİ",
+        "SİGORTA", "SIGORTA", "KOOPERATİF", "KOOPERATIFI", "KOOPERATİFİ",
+        "FABRİKA", "FABRIKA", "LOJİSTİK", "LOJISTIK", "İNŞAAT", "INSAAT", "OTOMOTİV", "OTOMOTIV",
+        "SANAYİ", "SANAYI", "TİCARET", "TICARET",
+        "KURUM", "KURUMU", "KURULUŞ", "KURULUS", "KURUL", "KURULU",
+        "BAKANLIK", "BAKANLIĞI", "BAKANLIGI", "MÜDÜRLÜK", "MÜDÜRLÜĞÜ", "MUDURLUK", "MUDURLUGU",
+        "DAİRE", "DAİRESİ", "DAIRE", "DAIRESI", "BAŞKANLIK", "BAŞKANLIĞI", "BASKANLIK", "BASKANLIGI",
+        "KOMİSYON", "KOMİSYONU", "KOMISYON", "KOMISYONU",
+        "BELEDİYE", "BELEDİYESİ", "BELEDIYE", "BELEDIYESI",
+        "VALİLİK", "VALİLİĞİ", "VALILIK", "VALILIGI", "KAYMAKAMLIK", "KAYMAKAMLIGI",
+        "EMNİYET", "EMNIYET", "JANDARMA", "NOTER", "NOTERLİĞİ", "NOTERLIGI", "NOTERİ",
+        "ŞUBE", "SUBE", "ŞUBESİ", "SUBESI", "FİRMA", "FIRMA", "FİRMASI", "FIRMASI",
+        "ŞAHIS", "SAHIS", "YETKİLİ", "YETKILI", "YETKİLİSİ", "YETKILISI",
+        "MÜDÜR", "MUDUR", "MÜDÜRÜ", "MUDURU", "TEMSİLCİ", "TEMSILCI", "TEMSİLCİSİ", "TEMSILCISI",
+        "KAŞE", "KAŞESİ", "KASESI", "İMZA", "IMZA",
+
+        # Sıfatlar & Taraf Etiketleri
+        "MÜVEKKİL", "MUVEKKIL", "MÜVEKKİLİ", "MUVEKKILI", "MÜVEKKİLİN", "MUVEKKILIN",
+        "DAVACI", "DAVACININ", "DAVALI", "DAVALININ",
+        "SANIK", "SANIĞIN", "SANIGIN", "ŞÜPHELİ", "SUPHELI", "ŞÜPHELİNİN", "SUPHELININ",
+        "MAĞDUR", "MAGDUR", "MAĞDURUN", "MAGDURUN",
+        "MÜŞTEKİ", "MUSTEKI", "KATILAN", "KATILANIN",
+        "BORÇLU", "BORCLU", "BORÇLUNUN", "BORCLUNUN", "ALACAKLI", "ALACAKLININ",
+        "İHBAR", "OLUNAN", "MÜDAFİ", "MUDAFI", "MÜDAFİİ", "MUDAFII",
+        "VEKİL", "VEKIL", "VEKİLİ", "VEKILI", "VEKİLLERİ", "VEKILLERI", "VEKİLİNİN", "VEKILININ",
+        "HAKİM", "HAKIM", "HÂKİM", "SAVCI", "SAVCISI", "KATİP", "KATIP", "KÂTİP",
+        "BİLİRKİŞİ", "BILIRKISI", "UZLAŞTIRMACI", "UZLASTIRMACI", "ARABULUCU", "ARABULUCULUK",
+
+        # Adres & Kimlik Etiketleri
+        "ADRES", "ADRESİ", "ADRESI", "İKAMETGÂH", "İKAMETGAH", "IKAMETGAH",
+        "TCKN", "VKN", "VERGİ", "VERGI", "KİMLİK", "KIMLIK",
+        "BABA", "ANNE", "DOĞUM", "DOGUM", "TARİH", "TARIH", "TARİHİ", "TARIHI", "YERİ", "YERI",
+
+        # Genel Dilbilgisel & Stopword Kelimeler
+        "İLE", "ILE", "VE", "VEYA", "İÇİN", "ICIN", "GÖRE", "GORE", "DAİR", "DAIR",
+        "HAKKINDA", "ALEYHİNE", "ALEYHINE", "LEHİNE", "LEHINE",
+        "UYARINCA", "GEREĞİNCE", "GEREGINCE", "NEDENİYLE", "NEDENIYLE", "DOLAYISIYLA",
+        "İLGİLİ", "ILGILI", "İŞBU", "ISBU", "DEFATEN", "BİRLİKTE", "BIRLIKTE",
+        "MÜNFERİDEN", "MUNFERIDEN", "MÜŞTEREKEN", "MUSTEREKEN",
+        "SAYGILARIMLA", "ARZ", "EDERİM", "EDERIM", "EDERİZ", "EDERIZ",
+        "SUNULUR", "BİLGİLERİNİZE", "BILGILERINIZE",
+        "KABULÜNE", "REDDİNE", "İADESİNE", "ONANMASINA", "BOZULMASINA"
     }
+
+    # Rol başlıklarından hemen sonra gelen kurumsal/genel niteleyiciler (Kesinlikle kişi adı değildir)
+    FALSE_POSITIVE_AFTER_ROLE = {
+        # Kurumsal ve Genel Sıfatlar / Terimler
+        "ŞİRKET", "ŞİRKETİ", "ŞİRKETLERİ", "ŞİRKETLER", "SIRKET", "SIRKETI", "SIRKETLERI", "SIRKETLER",
+        "ANONİM", "ANONIM", "ANONİM ŞİRKETİ", "ANONIM SIRKETI", "ANONİM ŞİRKET", "ANONIM SIRKET",
+        "LİMİTED", "LIMITED", "LİMİTED ŞİRKETİ", "LIMITED SIRKETI", "LİMİTED ŞİRKET", "LIMITED SIRKET",
+        "AŞ", "A.Ş.", "AS", "A.S.", "LTD", "LTD.", "ŞTİ", "ŞTİ.", "STI", "STI.",
+        "KOLLEKTİF", "KOLLEKTIF", "KOMANDİT", "KOMANDIT",
+        "KOOPERATİF", "KOOPERATİFİ", "KOOPERATİFLERİ", "KOOPERATIF", "KOOPERATIFI", "KOOPERATIFLERI",
+        "HOLDİNG", "HOLDİNGİ", "HOLDİNGİ A.Ş.", "HOLDING", "HOLDINGI",
+        "BANKA", "BANKASI", "BANKASİ", "BANKALAR", "BANKALARI",
+        "SİGORTA", "SİGORTASI", "SIGORTA", "SIGORTASI", "SİGORTA A.Ş.", "SIGORTA A.S.",
+        "FACTORING", "FAKTORİNG", "FAKTORING", "LEASING", "LİSİNG", "LISING",
+        "VARLIK YÖNETİM", "VARLIK YONETIM", "VARLIK YÖNETİMİ", "VARLIK YONETIMI",
+        "ORTAKLIK", "ORTAKLIĞI", "ORTAKLIGI", "ORTAKLAR", "ORTAKLARI",
+        "ADİ ORTAKLIK", "ADI ORTAKLIK", "ADİ ŞİRKET", "ADI SIRKET",
+        "ŞERİK", "ŞERİKİ", "ŞERİKLER", "ŞERİKLERİ", "SERIK", "SERIKI", "SERIKLER", "SERIKLERI",
+        "İŞLETME", "İŞLETMESİ", "ISLETME", "ISLETMESI", "MÜESSESE", "MÜESSESESİ", "MUESSESE", "MUESSESESI",
+        "FİRMA", "FİRMASI", "FIRMA", "FIRMASI", "ŞAHIS FİRMASI", "SAHIS FIRMASI",
+        "ŞAHIS İŞLETMESİ", "SAHIS ISLETMESI",
+
+        # Kamu Kurumları, İdareler ve Mülki Teşkilat
+        "İDARE", "İDARESİ", "İDARELERİ", "IDARE", "IDARESI", "IDARELERI",
+        "KURUM", "KURUMU", "KURUMLARI",
+        "KURULUŞ", "KURULUŞU", "KURULUŞLARI", "KURULUS", "KURULUSU", "KURULUSLARI",
+        "MÜDÜRLÜK", "MÜDÜRLÜĞÜ", "MUDURLUK", "MUDURLUGU", "MÜDÜRLÜKLERİ", "MUDURLUKLERI",
+        "GENEL MÜDÜRLÜK", "GENEL MÜDÜRLÜĞÜ", "GENEL MUDURLUK", "GENEL MUDURLUGU",
+        "BÖLGE MÜDÜRLÜK", "BÖLGE MÜDÜRLÜĞÜ", "BOLGE MUDURLUK", "BOLGE MUDURLUGU",
+        "İL MÜDÜRLÜĞÜ", "IL MUDURLUGU", "İLÇE MÜDÜRLÜĞÜ", "ILCE MUDURLUGU",
+        "ŞUBE MÜDÜRLÜĞÜ", "SUBE MUDURLUGU",
+        "BAŞKANLIK", "BAŞKANLIĞI", "BASKANLIK", "BASKANLIGI",
+        "DAİRE BAŞKANLIĞI", "DAIRE BASKANLIGI",
+        "DAİRE", "DAİRESİ", "DAIRE", "DAIRESI",
+        "BAKANLIK", "BAKANLIĞI", "BAKANLIKLARI", "BAKANLIGI", "BAKANLIKLARI",
+        "MÜSTEŞARLIK", "MÜSTEŞARLIĞI", "MUSTESARLIK", "MUSTESARLIGI",
+        "BELEDİYE", "BELEDİYESİ", "BELEDIYE", "BELEDIYESI", "BELEDİYE BAŞKANLIĞI", "BELEDIYE BASKANLIGI",
+        "BÜYÜKŞEHİR BELEDİYESİ", "BUYUKSEHIR BELEDIYESI", "BÜYÜKŞEHİR BELEDİYE BAŞKANLIĞI",
+        "VALİLİK", "VALİLİĞİ", "VALILIK", "VALILIGI",
+        "KAYMAKAMLIK", "KAYMAKAMLIĞI", "KAYMAKAMLIGI",
+        "DEFTERDARLIK", "DEFTERDARLIĞI", "DEFTERDARLIGI",
+        "HAZİNE", "HAZİNESİ", "HAZINE", "HAZINESI",
+        "MALİYE HAZİNESİ", "MALIYE HAZINESI", "DEVLET HAZİNESİ", "DEVLET HAZINESI",
+        "VERGİ DAİRESİ", "VERGI DAIRESI", "VERGİ DAİRESİ MÜDÜRLÜĞÜ", "VERGI DAIRESI MUDURLUGU",
+        "SGK", "SOSYAL GÜVENLİK KURUMU", "SOSYAL GUVENLIK KURUMU",
+        "SOSYAL GÜVENLİK İL MÜDÜRLÜĞÜ", "SOSYAL GUVENLIK IL MUDURLUGU",
+        "EMNİYET", "EMNİYETİ", "EMNİYET MÜDÜRLÜĞÜ", "EMNIYET", "EMNIYET MUDURLUGU",
+        "POLİS", "POLIS", "JANDARMA",
+        "KAMU", "DEVLET", "MİLLET", "TÜRK MİLLETİ", "TURK MILLETI", "T.C.", "TC",
+        "MÜLKİYE", "MULKIYE",
+        "REKTÖRLÜK", "REKTÖRLÜĞÜ", "REKTORLUK", "REKTORLUGU",
+        "ÜNİVERSİTE", "ÜNİVERSİTESİ", "UNIVERSITE", "UNIVERSITESI",
+        "FAKÜLTE", "FAKÜLTESİ", "FAKULTE", "FAKULTESI",
+        "DEKANLIK", "DEKANLIĞI", "DEKANLIGI",
+        "HASTANE", "HASTANESİ", "HASTANESI", "DEVLET HASTANESİ", "DEVLET HASTANESI",
+        "ŞEHİR HASTANESİ", "SEHIR HASTANESI", "SAĞLIK OCAĞI", "SAGLIK OCAGI",
+
+        # Meslek Kuruluşları, Odalar, Birlikler, STK'lar
+        "ODA", "ODASI", "ODALARI", "TİCARET ODASI", "TICARET ODASI",
+        "SANAYİ ODASI", "SANAYI ODASI", "TABİP ODASI", "TABIP ODASI",
+        "MİMARLAR ODASI", "MIMARLAR ODASI", "ECZACI ODASI", "ZİRAAT ODASI", "ZIRAAT ODASI",
+        "BİRLİK", "BİRLİĞİ", "BIRLIK", "BIRLIGI",
+        "BAROLAR BİRLİĞİ", "TÜRKİYE BAROLAR BİRLİĞİ", "TURKIYE BAROLAR BIRLIGI", "TBB",
+        "BARO", "BAROSU", "BAROLARI",
+        "DERNEK", "DERNEĞİ", "DERNEGI", "DERNEKLERİ", "DERNEKLERI",
+        "VAKIF", "VAKFI", "VAKIFLAR", "VAKIFLARI",
+        "SENDİKA", "SENDİKASI", "SENDIKASI",
+        "FEDERASYON", "FEDERASYONU", "KONFEDERASYON", "KONFEDERASYONU",
+        "KOMİSYON", "KOMİSYONU", "KOMISYON", "KOMISYONU",
+        "KURUL", "KURULU", "KURULLARI",
+        "ŞUBE", "ŞUBESİ", "SUBE", "SUBESI", "ŞUBELERİ", "SUBELERI",
+        "NOTER", "NOTERLİĞİ", "NOTERLIGI", "NOTERİ", "NOTERI",
+
+        # Yargı, İcra, İflas ve Tasfiye Organları / Rolleri
+        "MAHKEME", "MAHKEMESİ", "MAHKEMESI", "MAHKEMELERİ", "MAHKEMELERI",
+        "HÂKİMLİK", "HÂKİMLİĞİ", "HAKİMLİK", "HAKİMLİĞİ", "HAKIMLIK", "HAKIMLIGI",
+        "SAVCILIK", "SAVCILIĞI", "SAVCILIGI",
+        "BAŞSAVCILIK", "BAŞSAVCILIĞI", "BASSAVCILIK", "BASSAVCILIGI",
+        "CUMHURİYET BAŞSAVCILIĞI", "CUMHURIYET BASSAVCILIGI",
+        "İCRA DAİRESİ", "ICRA DAIRESI", "İCRA MÜDÜRLÜĞÜ", "ICRA MUDURLUGU",
+        "İCRA MAHKEMESİ", "ICRA MAHKEMESI",
+        "İFLAS İDARESİ", "IFLAS IDARESI", "İFLAS DAİRESİ", "IFLAS DAIRESI",
+        "İFLAS MASASI", "IFLAS MASASI", "İFLAS MEMURLUĞU", "IFLAS MEMURLUGU",
+        "MÜFLİS", "MUFLIS",
+        "TASFİYE", "TASFIYE",
+        "TASFİYE MEMURLUĞU", "TASFIYE MEMURLUGU", "TASFİYE MEMURU", "TASFIYE MEMURU",
+        "TASFİYE HALİNDE", "TASFIYE HALINDE", "TASFİYE KURULU", "TASFIYE KURULU",
+        "KONKORDATO", "KONKORDATO KOMİSERLİĞİ", "KONKORDATO KOMISERLIGI",
+        "KONKORDATO KOMİSERİ", "KONKORDATO KOMISERI",
+        "YEDİEMİN", "YEDIEMIN", "KAYYIM", "KAYYUM", "KAYYIMLIK", "KAYYUMLUK",
+        "VASİ", "VASI", "VASİLİK", "VASILIK", "VELİ", "VELI",
+
+        # Rol Tekrarları ve Rol Sonrası Yanlış Gelen Sıfatlar
+        "TARAF", "TARAFI", "TARAFLAR", "TARAFLARI", "TARAFLARCA", "TARAFLARIN",
+        "DAVACI TARAF", "DAVALI TARAF", "KARŞI TARAF", "KARSI TARAF",
+        "DAVACI ŞİRKET", "DAVALI ŞİRKET", "DAVACI SIRKET", "DAVALI SIRKET",
+        "DAVALI İDARE", "DAVALI IDARE", "DAVACI İDARE", "DAVACI IDARE",
+        "DAVALI KURUM", "DAVACI KURUM",
+        "DAVALI İŞVEREN", "DAVALI ISVEREN", "DAVACI İŞÇİ", "DAVACI ISCI",
+        "DAVACI", "DAVACILAR", "DAVACININ", "DAVACIYA",
+        "DAVALI", "DAVALILAR", "DAVALININ", "DAVALIYA",
+        "SANIK", "SANIKLAR", "SANIK TARAF",
+        "ŞÜPHELİ", "ŞÜPHELİLER", "SUPHELI", "SUPHELILER", "ŞÜPHELİ ŞAHIS", "SUPHELI SAHIS",
+        "MÜŞTEKİ", "MÜŞTEKİLER", "MUSTEKI", "MUSTEKILER", "MÜŞTEKİ SANIK",
+        "MAĞDUR", "MAĞDURLAR", "MAGDUR", "MAGDURLAR",
+        "KATILAN", "KATILANLAR", "KATILAN SANIK",
+        "MÜDAFİ", "MÜDAFİİ", "MÜDAFİLER", "MUDAFI", "MUDAFII",
+        "VEKİL", "VEKİLİ", "VEKİLLERİ", "VEKİLİNİN", "VEKILI", "VEKILLERI", "VEKILININ",
+        "VEKİLİDİR", "VEKILIDIR",
+        "DAVACI VEKİLİ", "DAVALI VEKİLİ", "SANIK MÜDAFİİ", "ŞÜPHELİ MÜDAFİİ",
+        "ASİL", "ASİLLER", "ASIL", "ASILLER", "DAVACI ASİL", "DAVALI ASİL",
+        "BORÇLU", "BORÇLULAR", "BORCLU", "BORCLULAR", "ASIL BORÇLU", "ASIL BORCLU",
+        "BORÇLU ŞİRKET", "BORCLU SIRKET", "BORÇLU ŞAHIS", "BORCLU SAHIS",
+        "ALACAKLI", "ALACAKLILAR", "ALACAKLI ŞİRKET", "ALACAKLI SIRKET", "ALACAKLI TARAF",
+        "İHBAR OLUNAN", "İHBAR OLUNANLAR", "IHBAR OLUNAN", "IHBAR OLUNANLAR",
+        "ÜÇÜNCÜ KİŞİ", "ÜÇÜNCÜ ŞAHIS", "UCUNCU KISI", "UCUNCU SAHIS",
+        "3. KİŞİ", "3. ŞAHIS", "3.KİŞİ", "3.ŞAHIS",
+        "MÜDAHİL", "MÜDAHİLLER", "MUDAHIL", "MUDAHILLER", "ASLİ MÜDAHİL", "FER'İ MÜDAHİL",
+        "MİRASÇI", "MİRASÇILAR", "MİRASÇILARI", "MIRASCI", "MIRASCILAR", "MIRASCILARI",
+        "MÜTEVEFFA", "MUTEVEFFA", "MURİS", "MURIS", "MURİSİ", "MURISI",
+        "İTİRAZ EDEN", "İTİRAZ EDENLER", "ITIRAZ EDEN", "ITIRAZ EDENLER",
+        "TALEP EDEN", "TALEP EDENLER", "ALEYHİNE TALEP OLUNAN",
+        "HÜKÜMLÜ", "HUKUMLU", "TUTUKLU", "TUTUKLULAR",
+        "BİLİRKİŞİ", "BİLİRKİŞİLER", "BILIRKISI", "BILIRKISILER",
+        "TANIK", "TANIKLAR",
+        "DAVA DIŞI", "DAVA DISI", "DAVA DIŞI ŞAHIS", "DAVA DIŞI ŞİRKET",
+        "GERÇEK KİŞİ", "GERCEK KISI", "TÜZEL KİŞİ", "TUZEL KISI", "TÜZEL KİŞİLİK", "TUZEL KISILIK",
+        "İŞVEREN", "İŞVERENLER", "ISVEREN", "ISVERENLER",
+        "İŞÇİ", "İŞÇİLER", "ISCI", "ISCILER",
+        "MÜVEKKİL", "MÜVEKKİLİ", "MUVEKKIL", "MUVEKKILI",
+        "MÜŞTERİ", "MÜŞTERİSİ", "MUSTERI", "MUSTERISI",
+        "KİRACI", "KİRACILAR", "KIRACI", "KIRACILAR"
+    }
+
+    # Bir kişi adında KESİNLİKLE bulunamayacak kurumsal / idari / rol isim kökleri
+    INSTITUTION_NOUNS = {
+        "ŞİRKET", "ŞİRKETİ", "ŞİRKETLERİ", "SIRKET", "SIRKETI",
+        "İDARE", "İDARESİ", "IDARE", "IDARESI",
+        "KURUM", "KURUMU", "KURULUŞ", "KURULUŞU", "KURULUS", "KURULUSU",
+        "MÜDÜRLÜK", "MÜDÜRLÜĞÜ", "MUDURLUK", "MUDURLUGU",
+        "BAŞKANLIK", "BAŞKANLIĞI", "BASKANLIK", "BASKANLIGI",
+        "DAİRE", "DAİRESİ", "DAIRE", "DAIRESI",
+        "BANKA", "BANKASI", "BANKASİ",
+        "SİGORTA", "SİGORTASI", "SIGORTA", "SIGORTASI",
+        "HOLDİNG", "HOLDING", "HOLDİNGİ", "HOLDINGI",
+        "BELEDİYE", "BELEDİYESİ", "BELEDIYE", "BELEDIYESI",
+        "VALİLİK", "VALİLİĞİ", "VALILIK", "VALILIGI",
+        "KAYMAKAMLIK", "KAYMAKAMLIĞI", "KAYMAKAMLIGI",
+        "BAKANLIK", "BAKANLIĞI", "BAKANLIGI",
+        "ODA", "ODASI", "BİRLİK", "BİRLİĞİ", "BIRLIK", "BIRLIGI",
+        "DERNEK", "DERNEĞİ", "DERNEGI", "VAKIF", "VAKFI",
+        "AŞ", "A.Ş.", "LTD", "ŞTİ", "STI", "ANONİM", "ANONIM", "LİMİTED", "LIMITED",
+        "ORTAKLIK", "ORTAKLIĞI", "ORTAKLIGI",
+        "MÜSTEŞARLIK", "MÜSTEŞARLIĞI", "MUSTESARLIK", "MUSTESARLIGI",
+        "KOMİSYON", "KOMİSYONU", "KOMISYON", "KOMISYONU",
+        "ŞUBE", "ŞUBESİ", "SUBE", "SUBESI",
+        "MÜLKİYE", "HAZİNE", "HAZİNESİ", "HAZINE", "HAZINESI",
+        "DEFTERDARLIK", "DEFTERDARLIĞI", "DEFTERDARLIGI",
+        "BAŞSAVCILIK", "BAŞSAVCILIĞI", "BASSAVCILIK", "BASSAVCILIGI",
+        "SAVCILIK", "SAVCILIĞI", "SAVCILIGI",
+        "MAHKEME", "MAHKEMESİ", "MAHKEMESI",
+        "HÂKİMLİK", "HAKİMLİK", "HAKİMLİĞİ", "HAKIMLIK", "HAKIMLIGI",
+        "MEMURLUK", "MEMURLUĞU", "MEMURLUGU", "MEMUR", "MEMURU",
+        "MASASI", "KOMİSERİ", "KOMİSERLİĞİ", "KOMISERLIGI",
+        "TARAF", "TARAFI", "TARAFLAR", "TARAFLARI",
+        "DAVACI", "DAVALI", "SANIK", "ŞÜPHELİ", "MÜŞTEKİ", "MAĞDUR", "KATILAN",
+        "VEKİLİ", "VEKİLLERİ", "VEKİLİNİN", "VEKILI", "VEKILLERI",
+        "BORÇLU", "ALACAKLI", "İHBAR", "MÜDAFİ", "ASİL",
+        "İŞVEREN", "İŞÇİ", "MÜVEKKİL"
+    }
+
+    # Kamu kurumu ve adli makam son ekleri (Şirket regex'ine takılsa bile şirket sayılamaz)
+    PUBLIC_INSTITUTION_ENDINGS = (
+        "MAHKEMESİ", "MAHKEMESI", "HAKİMLİĞİ", "HAKIMLIGI", "SAVCILIĞI", "SAVCILIGI",
+        "BAŞKANLIĞI", "BASKANLIGI", "MÜDÜRLÜĞÜ", "MUDURLUGU", "BAKANLIĞI", "BAKANLIGI",
+        "VALİLİĞİ", "VALILIGI", "KAYMAKAMLIĞI", "KAYMAKAMLIGI", "BELEDİYESİ", "BELEDIYESI",
+        "DAİRESİ", "DAIRESI", "KOMİSYONU", "KOMISYONU", "ODASI", "BİRLİĞİ", "BIRLIGI",
+        "DEFTERDARLIĞI", "DEFTERDARLIGI", "MEMURLUĞU", "MEMURLUGU", "BÜROSU", "BUROSU"
+    )
 
     # Kelime sınırlarına tam uyan şirket ekleri regexi (kelime içindeki 'aş' veya 'sti' ile karışmaz)
     COMPANY_RE = re.compile(
         r"\b(?:A\.?Ş\.?|LTD\.?\s*ŞT[İI]\.?|ŞT[İI]\.?|LTD\.?|AŞ|ANON[İI]M\s+Ş[İI]RKET[İI]|"
         r"L[İI]M[İI]TED\s+Ş[İI]RKET[İI]|HOLD[İI]NG|BANKAS[İI]|KOOPERAT[İI]F[İI]|"
-        r"S[İI]GORTA|FABR[İI]KA|LOJ[İI]ST[İI]K|İNŞAAT|INSAAT|OTOMOT[İI]V)\b",
+        r"S[İI]GORTA|FABR[İI]KA|LOJ[İI]ST[İI]K|İNŞAAT|INSAAT|OTOMOT[İI]V)(?=[\s,;:.?!]|$)",
         re.IGNORECASE
     )
 
@@ -235,28 +492,42 @@ class KVKKDetector:
     def clean_party_entry(cls, raw_str: str) -> Tuple[str, bool]:
         """
         Taraf başlığından gelen ham metni temizler.
+        Açgözlülüğü önler, satır içi etiketlerde (TCKN, Adres, Vekili vb.) keser
+        ve şirket ise şirket unvanı sınırında sonlandırır.
         Dönüş: (temiz_isim, sirket_mi)
         """
         # 1. Başındaki '1-', '1.', 'a)', '1 )' gibi liste işaretlerini temizle
         s = re.sub(r"^\s*(?:\d+|[a-zA-Z])[\s.-]+", "", raw_str).strip()
 
-        # 2. Parantez içi bilgileri ayıkla (TCKN: ...), (VKN: ...) vb.
+        # 2. Satır içi devam eden etiketler (TCKN, VKN, Adres, Vekili vb.) başladığı yerden kes
+        cutoff_match = cls.PARTY_CUTOFF_RE.search(s)
+        if cutoff_match:
+            s = s[:cutoff_match.start()].strip()
+
+        # 3. Parantez içi bilgileri ayıkla (TCKN: ...), (VKN: ...) vb.
         s = re.sub(r"\s*\([^)]*\)", "", s).strip()
 
-        # 3. Tire veya çizgiyle ayrılan TCKN/VKN/Sicil eklerini kes
-        parts = re.split(r"\s+[-–—]\s+", s)
+        # 4. Tire veya çizgiyle ayrılan TCKN/VKN/Sicil eklerini kes
+        parts = re.split(r"\s+[-–—|]\s+", s)
         if len(parts) > 1:
             s = parts[0].strip()
 
-        # 4. Satır sonundaki sicil veya numara kalıntılarını temizle (örn: 'Mehmet Akif ÖZTÜRK 123456')
+        # 5. Satır sonundaki sicil veya numara kalıntılarını temizle (örn: 'Mehmet Akif ÖZTÜRK 123456')
         s = re.sub(r"\s+\d{4,11}$", "", s).strip()
 
-        # 5. Başta ve sonda kalan noktalama işaretlerini kaldır
+        # 6. Başta ve sonda kalan noktalama işaretlerini kaldır
         s = s.strip(",;:-/ ")
 
-        # Şirket mi kontrolü (kelime sınırları ile hassas kontrol)
+        # 7. Şirket mi kontrolü (kelime sınırları ile hassas kontrol)
         norm = tr_upper(s)
         is_company = bool(cls.COMPANY_RE.search(norm))
+
+        # 8. Eğer şirket unvanı ise, şirket uzantısından (A.Ş., Ltd. Şti. vb.) sonra gelen adres/artıkları kes
+        if is_company:
+            comp_matches = list(cls.COMPANY_RE.finditer(s))
+            if comp_matches:
+                last_end = comp_matches[-1].end()
+                s = s[:last_end].strip()
 
         return s, is_company
 
@@ -277,8 +548,23 @@ class KVKKDetector:
         words = norm.split()
         words_set = set(words)
 
+        # 1. Aday metin bütünüyle FALSE_POSITIVE_AFTER_ROLE veya INSTITUTION_KEYWORDS içindeyse REDDET
+        if norm in cls.FALSE_POSITIVE_AFTER_ROLE or norm in cls.INSTITUTION_KEYWORDS:
+            return
+
+        # 2. TEK KELİMELİK ADAYLARI KESİNLİKLE REDDET:
+        # Türk hukukunda taraf ismi tek bir kelimeden (örn: 'Şirket', 'İdare', 'Banka', 'Davacı', 'Ahmet') oluşamaz.
+        # Kişi adı için en az 2 kelimeli (Ad + Soyad) kuralı şart koşulur.
+        if len(words) < 2:
+            return
+
+        # 3. Şirket / Kurum Ayrımı
         if is_comp:
-            if len(cleaned) >= 4 and not (words_set & cls.INSTITUTION_KEYWORDS):
+            # Şirket gibi görünen ama aslında kamu kurumu/mahkeme olanları ele (örn: 'Kadıköy 1. Asliye Hukuk Mahkemesi')
+            if any(norm.endswith(end) for end in cls.PUBLIC_INSTITUTION_ENDINGS):
+                return
+            # Şirket adayının bütünü false positive listesinde değilse ve en az 4 karakterse kaydet
+            if len(cleaned) >= 4 and norm not in cls.FALSE_POSITIVE_AFTER_ROLE:
                 found_companies.add(cleaned)
                 results.append({
                     "category": "SIRKET_UNVANI",
@@ -286,12 +572,20 @@ class KVKKDetector:
                     "confidence": confidence
                 })
         else:
-            # Mahkeme kararı terimleri, hüküm fiilleri ve kurum başlıkları isim sayılamaz
-            if words_set & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
+            # 4. Kişi Adı (TARAF_ISMI) Sertleştirilmiş Filtreleri:
+            # Aday içinde kurum / rol isim kökleri geçiyorsa ("Davalı İdare", "Davacı Taraf", "Davalı Şirket",
+            # "İflas İdaresi", "Tasfiye Memurluğu", "İstanbul Vergi Dairesi" vb.) KESİNLİKLE KİŞİ ADI SAYILMAZ!
+            if words_set & cls.INSTITUTION_NOUNS:
+                return
+
+            # Genel kurum kelimeleri ve hüküm fiilleri filtresi
+            if words_set & cls.INSTITUTION_KEYWORDS:
                 return
             if any(cls.is_judgment_word(w) for w in words):
                 return
-            if len(words) >= 2 or (len(words) == 1 and len(cleaned) >= 4):
+
+            # Geçerli Ad + Soyad şartı (en az 2 kelime, her kelime en az 2 karakter)
+            if all(len(w) >= 2 for w in words):
                 found_names.add(cleaned)
                 results.append({
                     "category": "TARAF_ISMI",
@@ -423,7 +717,7 @@ class KVKKDetector:
 
         # 12. UYAP Taraf Başlıklarındaki İsimler ve Numaralandırılmış Taraf Listeleri
         for match in cls.PARTY_HEADER_PATTERN.finditer(text):
-            raw_entry = match.group(1).strip()
+            raw_entry = (match.group(2) if match.lastindex and match.lastindex >= 2 else match.group(1)).strip()
             first_line = re.split(r"[\n\r]", raw_entry)[0].strip()
             cls._add_party_candidate(first_line, results, found_names, found_companies, confidence=0.95)
 
@@ -451,13 +745,15 @@ class KVKKDetector:
             name_cand = (match.group(1) or match.group(2) or "").strip()
             norm = tr_upper(name_cand)
             cand_words = set(norm.split())
-            if cand_words & cls.INSTITUTION_KEYWORDS:
+            if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
                 continue
             if any(cls.is_judgment_word(w) for w in cand_words):
                 continue
-            if any(term in norm for term in ("A.Ş", "LTD", "STI", "ŞTİ", "SANAYI", "SANAYİ")):
+            if any(term in norm for term in ("A.Ş", "LTD", "STI", "ŞTİ", "SANAYI", "SANAYİ", "HOLDING", "BANKA")):
                 continue
-            if name_cand and len(name_cand) >= 4:
+            words = name_cand.split()
+            # En az 2 kelime olmalı ve her kelime en az 2 karakter içermeli
+            if len(words) >= 2 and all(len(w) >= 2 for w in words):
                 found_names.add(name_cand)
                 results.append({
                     "category": "TARAF_ISMI",
@@ -474,6 +770,8 @@ class KVKKDetector:
             if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
                 continue
             if any(cls.is_judgment_word(w) for w in cand_words):
+                continue
+            if any(term in norm for term in ("A.Ş", "LTD", "STI", "ŞTİ", "SANAYI", "SANAYİ", "HOLDING", "BANKA")):
                 continue
             words = cand.split()
             if len(words) in (2, 3) and len(cand) >= 6 and all(len(w) >= 2 for w in words):
@@ -628,7 +926,7 @@ class KVKKDetector:
                         page_number=page_index,
                         rect=(r.x0, r.y0, r.x1, r.y1),
                         confidence=ent["confidence"],
-                        approved=True,
+                        approved=False,
                     )
                 )
 
