@@ -132,6 +132,9 @@ class PDFRedactor:
             "under_uyap_limit": uyap_opt.get("under_uyap_limit", True),
         }
 
+    # Kolaylık ve geriye dönük uyumluluk için alias
+    redact_pdf = apply_redactions_to_pdf
+
     UYAP_MAX_BYTES = 10 * 1024 * 1024  # 10 MB UYAP yükleme sınırı
 
     @classmethod

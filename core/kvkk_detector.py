@@ -15,6 +15,15 @@ otomatik olarak derinlemesine tespit eder ve koordinatlarını bulur.
 
 import re
 from dataclasses import dataclass
+from core.gazetteer import (
+    NVI_FIRST_NAMES,
+    NVI_SURNAMES,
+    TURKISH_PROVINCES,
+    TURKISH_DISTRICTS,
+    LegalMorphologyEngine,
+    JudicialOfficialParser,
+)
+
 from typing import List, Dict, Optional, Tuple, Set, Any
 
 
@@ -99,7 +108,7 @@ class KVKKDetector:
     PARTY_ROLES_STRING = (
         r"DAVACI(?:LAR)?|DAVALI(?:LAR)?|SANIK(?:LAR)?|ŞÜPHELİ(?:LER)?|SUPHELI(?:LER)?|"
         r"MAĞDUR(?:LAR)?|MAGDUR(?:LAR)?|MÜŞTEKİ(?:LER)?|MUSTERI(?:LER)?|KATILAN(?:LAR)?|"
-        r"MÜDAFİ(?:LER)?|MUDAFI(?:LER)?|VEKİLİ|VEKİLLERİ|VEKILI|VEKILLERI|"
+        r"MÜDAFİ(?:İ|LERİ|LER)?|MUDAFI(?:I|LERI|LER)?|VEKİLİ|VEKİLLERİ|VEKILI|VEKILLERI|"
         r"BORÇLU(?:LAR)?|BORCLU(?:LAR)?|ALACAKLI(?:LAR)?|İHBAR\s+OLUNAN(?:LAR)?|IHBAR\s+OLUNAN(?:LAR)?|"
         r"ÜÇÜNCÜ\s+(?:ŞAHIS|KİŞİ)(?:LER)?|UCUNCU\s+(?:SAHIS|KISI)(?:LER)?|"
         r"ASLİ\s+MÜDAHİL|FER'İ\s+MÜDAHİL|MÜDAHİL(?:LER)?|MUDAHIL(?:LER)?|"
@@ -457,14 +466,22 @@ class KVKKDetector:
 
     @classmethod
     def is_judgment_word(cls, word: str) -> bool:
-        """Kelimenin hüküm fıkrası eylemi (-ine, -üne, -sine, -masına, vb.) olup olmadığını doğrular."""
+        """Kelimenin hüküm fıkrası eylemi veya adli karar fiili olup olmadığını doğrular."""
+        if not word:
+            return False
         w = tr_upper(word)
+        if LegalMorphologyEngine.is_judgment_phrase(w):
+            return True
         suffixes = (
             "İNE", "INE", "ÜNE", "UNE", "INA", "UNA",
             "SINE", "SİNE", "SINA", "SUNA",
             "MASINA", "MESİNE", "MESINE",
+            "MASI", "MESİ", "MESI", "ILMASI", "İLMESİ", "ILMASINA", "İLMESİNE",
+            "KABULÜ", "KABULU", "REDDİ", "REDDI",
+            "BOZULMASI", "ONANMASI", "KALDIRILMASI", "BİRLEŞTİRİLMESİ", "DÜŞÜRÜLMESİ",
             "ĞİNE", "GINE", "LİĞİNE", "LIGINE",
-            "MİŞTİR", "MISTIR", "MIŞTIR", "MÜŞTÜR"
+            "MİŞTİR", "MISTIR", "MIŞTIR", "MÜŞTÜR",
+            "HÜKMOLUNDU", "HÜKMOLUNMASINA", "VERİLDİ", "VERİLMESİNE"
         )
         return any(w.endswith(s) for s in suffixes)
 
@@ -512,7 +529,8 @@ class KVKKDetector:
         if len(parts) > 1:
             s = parts[0].strip()
 
-        # 5. Satır sonundaki sicil veya numara kalıntılarını temizle (örn: 'Mehmet Akif ÖZTÜRK 123456')
+        # 5. Satır sonundaki sicil veya numara kalıntılarını ayıkla (örn: 'Mehmet Akif ÖZTÜRK 123456')
+        sicil_match = re.search(r"\s+(\d{4,11})$", s)
         s = re.sub(r"\s+\d{4,11}$", "", s).strip()
 
         # 6. Başta ve sonda kalan noktalama işaretlerini kaldır
@@ -540,11 +558,28 @@ class KVKKDetector:
         found_companies: Set[str],
         confidence: float = 0.95
     ):
+        # Satır sonundaki olası sicil numarasını yakala (örn: 'HÂKİM : İsim Soyisim 123456')
+        sicil_match = re.search(r"(?:sicil(?:\s*no)?[:\s\-]*|\s+)(\d{4,8})(?:\)|$)", candidate_text, re.IGNORECASE)
+        if sicil_match:
+            sicil_val = sicil_match.group(1).strip()
+            if len(sicil_val) >= 4 and sicil_val.isdigit():
+                results.append({
+                    "category": "SICIL_NO",
+                    "value": sicil_val,
+                    "confidence": 1.0,
+                    "approved": True
+                })
+
         cleaned, is_comp = cls.clean_party_entry(candidate_text)
         if not cleaned or len(cleaned) < 3:
             return
 
         norm = tr_upper(cleaned)
+
+        # 0. Aday bütünüyle adli bir hüküm/usul kalıbı ise (örn: 'KARARIN KALDIRILMASINA') KESİNLİKLE REDDET
+        if LegalMorphologyEngine.is_judgment_phrase(norm):
+            return
+
         words = norm.split()
         words_set = set(words)
 
@@ -600,6 +635,12 @@ class KVKKDetector:
         found_companies: Set[str] = set()
         found_tckn_digits: Set[str] = set()
         found_vkn_digits: Set[str] = set()
+
+        # 0. Hâkim, Savcı, Zabıt Kâtibi ve Sicil Numaraları (Çift Çıktılı Doğrulama)
+        for off_ent in JudicialOfficialParser.parse_officials(text):
+            results.append(off_ent)
+            if off_ent["category"] == "TARAF_ISMI":
+                found_names.add(off_ent["value"])
 
         # 1. TCKN Taraması
         for match in cls.TCKN_PATTERN.finditer(text):
@@ -685,7 +726,7 @@ class KVKKDetector:
                 "confidence": 0.99
             })
 
-        # 9. Adres Bilgileri
+        # 9. Adres Bilgileri (Başlıklı ve Serbest Metin)
         for match in cls.ADDRESS_HEADER_PATTERN.finditer(text):
             raw_addr = match.group(1).strip()
             clean_addr = " ".join(raw_addr.split())
@@ -693,7 +734,27 @@ class KVKKDetector:
                 results.append({
                     "category": "ADRES",
                     "value": clean_addr,
-                    "confidence": 0.95
+                    "confidence": 0.95,
+                    "approved": True
+                })
+
+        # 9.b Serbest Metin Hiyerarşik Adres Ayrıştırıcı (Örn: 'Atatürk Mah. Fevzi Çakmak Cad. No:14/2 Kadıköy / İSTANBUL')
+        free_addr_pattern = re.compile(
+            r"\b([A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{3,35}\s+(?:Mahallesi|Mah\.|Köyü)\s+"
+            r"[A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{3,35}\s+(?:Caddesi|Cad\.|Sokağı|Sok\.|Bulvarı|Bulv\.)"
+            r"(?:\s+No\s*[:.-]?\s*\d+[a-zA-Z]?(?:/\d+)?)?"
+            r"(?:\s+(?:Kat\s*[:.-]?\s*\d+|Daire\s*[:.-]?\s*\d+))?"
+            r"(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s*/\s*[A-ZÇĞİÖŞÜa-zçğıöşü]+)?)?)\b",
+            re.IGNORECASE
+        )
+        for match in free_addr_pattern.finditer(text):
+            cand_addr = " ".join(match.group(0).split())
+            if len(cand_addr) >= 15:
+                results.append({
+                    "category": "ADRES",
+                    "value": cand_addr,
+                    "confidence": 0.88,
+                    "approved": False
                 })
 
         # 10. Kimlik / Aile Bilgileri (Baba Adı, Anne Adı, Doğum Tarihi/Yeri)
@@ -744,6 +805,8 @@ class KVKKDetector:
         for match in cls.RUNNING_TEXT_NAME_PATTERN.finditer(text):
             name_cand = (match.group(1) or match.group(2) or "").strip()
             norm = tr_upper(name_cand)
+            if LegalMorphologyEngine.is_judgment_phrase(norm):
+                continue
             cand_words = set(norm.split())
             if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
                 continue
@@ -761,10 +824,56 @@ class KVKKDetector:
                     "confidence": 0.90
                 })
 
+        # 13.b Metin İçi Hitaplı ve Rol Başlıklı İsimler ("Burak Bey", "Ayşe Hanım", "Tanık Mehmet Demir")
+        honorific_pattern = re.compile(
+            r"\b(?:(Tanık|Sanık|Mağdur|Mirasçı|Müteveffa|Vasi|Kayyım)\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1,2})|"
+            r"([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)?)\s+(Bey(?:'?[a-zçğıöşü]+)?|Hanım(?:'?[a-zçğıöşü]+)?|Efendi(?:'?[a-zçğıöşü]+)?))\b",
+            re.UNICODE
+        )
+        for match in honorific_pattern.finditer(text):
+            role_cand = match.group(2)
+            hon_cand = match.group(3)
+            name_cand = (role_cand or hon_cand or "").strip()
+            if name_cand and len(name_cand) >= 3:
+                norm_cand = tr_upper(name_cand)
+                if not LegalMorphologyEngine.is_judgment_phrase(norm_cand) and norm_cand not in cls.INSTITUTION_KEYWORDS:
+                    found_names.add(name_cand)
+                    results.append({
+                        "category": "TARAF_ISMI",
+                        "value": name_cand,
+                        "confidence": 0.92,
+                        "approved": False
+                    })
+
+        # 13.c NVİ Gazetteer Doğrulamalı Metin İçi İki Kelimeli İsim Tespiti
+        inline_nvi_pattern = re.compile(
+            r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,15})\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,20})\b",
+            re.UNICODE
+        )
+        for match in inline_nvi_pattern.finditer(text):
+            w1 = match.group(1).strip()
+            w2 = match.group(2).strip()
+            norm1 = tr_upper(w1)
+            norm2 = tr_upper(w2)
+            if norm1 in NVI_FIRST_NAMES and norm2 in NVI_SURNAMES:
+                full_norm = f"{norm1} {norm2}"
+                if not LegalMorphologyEngine.is_judgment_phrase(full_norm) and full_norm not in cls.INSTITUTION_KEYWORDS:
+                    if norm1 not in cls.INSTITUTION_KEYWORDS and norm2 not in cls.INSTITUTION_KEYWORDS:
+                        cand_name = f"{w1} {w2}"
+                        found_names.add(cand_name)
+                        results.append({
+                            "category": "TARAF_ISMI",
+                            "value": cand_name,
+                            "confidence": 0.88,
+                            "approved": False
+                        })
+
         # 14. Tamamı Büyük Harfli İsimler (Dilekçe sonundaki vekil/taraf imzaları)
         for match in cls.ALL_CAPS_NAME_PATTERN.finditer(text):
             cand = match.group(1).strip()
             norm = tr_upper(cand)
+            if LegalMorphologyEngine.is_judgment_phrase(norm):
+                continue
             cand_words = set(norm.split())
             # Resmi mahkeme ve dilekçe bölüm başlıkları KİŞİ ADI DEĞİLDİR
             if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
@@ -861,7 +970,7 @@ class KVKKDetector:
         filtered = []
         for ent in raw_entities:
             cat = ent["category"]
-            if cat == "TARAF_ISMI" and not detect_names:
+            if cat in ("TARAF_ISMI", "SICIL_NO") and not detect_names:
                 continue
             if cat == "SIRKET_UNVANI" and not detect_companies:
                 continue
@@ -919,6 +1028,10 @@ class KVKKDetector:
                     continue
                 seen_coords.add(coord_key)
 
+                # 2 Kademeli Onay: Tier 1 (>=0.95) -> approved=True, Tier 2 (<0.95) -> approved=False
+                is_tier1 = (ent.get("confidence", 0.9) >= 0.95)
+                entity_approved = ent.get("approved", is_tier1)
+
                 page_entities.append(
                     KVKKEntity(
                         category=ent["category"],
@@ -926,7 +1039,7 @@ class KVKKDetector:
                         page_number=page_index,
                         rect=(r.x0, r.y0, r.x1, r.y1),
                         confidence=ent["confidence"],
-                        approved=False,
+                        approved=entity_approved,
                     )
                 )
 
