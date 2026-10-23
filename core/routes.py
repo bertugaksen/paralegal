@@ -7,6 +7,7 @@ from typing import Callable, Dict, Any
 import pymupdf as fitz
 from core.converter import ImageConverter
 from core.excel_converter import ExcelConverter
+from core.word_converter import WordConverter
 from core.kvkk_detector import KVKKDetector
 from core.redactor import PDFRedactor
 from core.dialog_utils import (
@@ -226,6 +227,19 @@ class RouteHandler:
         except Exception as e:
             self.server._send_json({"error": str(e)}, 500)
 
+    def convert_word(self, path: str, data: Dict[str, Any]):
+        input_path = data.get("input_path")
+        if not input_path or not os.path.exists(input_path):
+            self.server._send_json({"error": "Word dosyası bulunamadı"}, 404)
+            return
+        try:
+            res = WordConverter.convert_word_to_pdf(
+                input_path=input_path, output_path=data.get("output_path")
+            )
+            self.server._send_json({"success": True, "output_path": res})
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
     def convert_images(self, path: str, data: Dict[str, Any]):
         input_paths = data.get("input_paths", [])
         combine = data.get("combine", False)
@@ -254,6 +268,8 @@ class RouteHandler:
                             tmp_pdf = os.path.join(temp_dir, f"doc_{idx}.pdf")
                             if ExcelConverter.is_supported(p_str):
                                 ExcelConverter.convert_excel_to_pdf(p_str, tmp_pdf, orientation=excel_opts.get("orientation", "auto"), fit_width=excel_opts.get("fit_width", True), repeat_header=excel_opts.get("repeat_header", True))
+                            elif WordConverter.is_supported(p_str):
+                                WordConverter.convert_word_to_pdf(p_str, tmp_pdf)
                             elif ImageConverter.is_supported(p_str):
                                 ImageConverter.convert_image_to_pdf(p_str, tmp_pdf, rotation=rotations.get(p_str, 0))
                             temp_pdfs.append(tmp_pdf)
@@ -280,6 +296,8 @@ class RouteHandler:
                     out_path = os.path.join(output_dir, f"{p.stem}.pdf") if output_dir else str(p.with_suffix(".pdf"))
                     if ExcelConverter.is_supported(p_str):
                         results.append(ExcelConverter.convert_excel_to_pdf(p_str, out_path, orientation=excel_opts.get("orientation", "auto"), fit_width=excel_opts.get("fit_width", True), repeat_header=excel_opts.get("repeat_header", True)))
+                    elif WordConverter.is_supported(p_str):
+                        results.append(WordConverter.convert_word_to_pdf(p_str, out_path))
                     else:
                         results.append(ImageConverter.convert_image_to_pdf(p_str, out_path, rotation=rotations.get(p_str, 0)))
 
@@ -307,5 +325,6 @@ class RouteHandler:
             "/api/apply-redactions": self.apply_redactions,
             "/api/analyze-excel": self.analyze_excel,
             "/api/convert-excel": self.convert_excel,
+            "/api/convert-word": self.convert_word,
             "/api/convert-images": self.convert_images,
         }

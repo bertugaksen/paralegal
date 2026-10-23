@@ -124,3 +124,49 @@ def test_api_convert_images(api_server, tmp_path):
     assert conv_res["success"] is True
     assert len(conv_res["output_paths"]) == 1
     assert os.path.exists(conv_res["output_paths"][0])
+
+
+def test_api_convert_word(api_server, tmp_path):
+    import docx
+    sample_doc = str(tmp_path / "itiraz_dilekcesi.docx")
+    d = docx.Document()
+    d.add_heading("İSTANBUL 2. İCRA HUKUK MAHKEMESİ", level=1)
+    d.add_paragraph("Borca ve yetkiye itirazlarımızın sunulmasıdır.")
+    d.save(sample_doc)
+
+    out_pdf = str(tmp_path / "itiraz_dilekcesi.pdf")
+    res = post_json(f"{api_server}/api/convert-word", {
+        "input_path": sample_doc,
+        "output_path": out_pdf
+    })
+    assert res["success"] is True
+    assert os.path.exists(out_pdf)
+
+
+def test_api_hybrid_combine_word_and_image(api_server, tmp_path):
+    import docx
+    from PIL import Image
+
+    doc_p = str(tmp_path / "dilekce_ek.docx")
+    d = docx.Document()
+    d.add_paragraph("Delil listesi ve açıklamaları.")
+    d.save(doc_p)
+
+    img_p = str(tmp_path / "delil_fotografi.png")
+    im = Image.new("RGB", (300, 300), color=(180, 200, 220))
+    im.save(img_p)
+
+    conv_res = post_json(f"{api_server}/api/convert-images", {
+        "input_paths": [doc_p, img_p],
+        "combine": True,
+        "output_dir": str(tmp_path)
+    })
+    assert conv_res["success"] is True
+    assert len(conv_res["output_paths"]) == 1
+    combined_pdf = conv_res["output_paths"][0]
+    assert os.path.exists(combined_pdf)
+
+    import pymupdf as fitz
+    merged = fitz.open(combined_pdf)
+    assert len(merged) >= 2
+    merged.close()

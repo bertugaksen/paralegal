@@ -12,10 +12,13 @@ def ask_open_filename(file_type: str = "pdf"):
         filetypes = [("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"), ("Tüm Dosyalar", "*.*")]
     elif file_type == "excel":
         filetypes = [("Excel Tabloları", "*.xlsx *.xls"), ("Tüm Dosyalar", "*.*")]
+    elif file_type == "word":
+        filetypes = [("Word Belgeleri", "*.docx *.doc"), ("Tüm Dosyalar", "*.*")]
     elif file_type in ("converter", "all_supported"):
         filetypes = [
-            ("Dönüştürülebilir Belgeler (Excel & Görsel)", "*.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
-            ("Excel Tabloları", "*.xlsx *.xls"),
+            ("Dönüştürülebilir Belgeler (Word, Excel & Görseller)", "*.docx *.doc *.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+            ("Word Belgeleri (*.docx, *.doc)", "*.docx *.doc"),
+            ("Excel Tabloları (*.xlsx, *.xls)", "*.xlsx *.xls"),
             ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
             ("Tüm Dosyalar", "*.*")
         ]
@@ -32,8 +35,9 @@ def ask_open_filenames():
     root.attributes("-topmost", True)
 
     filetypes = [
-        ("Desteklenen Belgeler (Excel & Görseller)", "*.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
-        ("Excel Tabloları", "*.xlsx *.xls"),
+        ("Desteklenen Belgeler (Word, Excel & Görseller)", "*.docx *.doc *.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+        ("Word Belgeleri (*.docx, *.doc)", "*.docx *.doc"),
+        ("Excel Tabloları (*.xlsx, *.xls)", "*.xlsx *.xls"),
         ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
         ("Tüm Dosyalar", "*.*")
     ]

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   FileImage,
   FileSpreadsheet,
+  FileText,
   Table,
   Sliders,
   Check,
@@ -218,7 +219,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                 Dönüştürülecek Evrak ve Tabloları Seçin
               </h3>
               <p className="text-sm text-[#575A65] max-w-lg mx-auto mb-6 font-medium">
-                TIFF, TIF, JPEG, JPG, PNG formatındaki taramaları veya hesaplama/ekstre içeren Excel (.xlsx, .xls) tablolarını seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
+                Word (.docx, .doc), Excel (.xlsx, .xls) veya taranmış delil görsellerini (TIFF, JPEG, PNG, WEBP) seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
               </p>
 
               <button className="brutal-btn py-3.5 px-8 bg-[#121316] text-white font-bold text-sm inline-flex items-center gap-2 hover:bg-[#1E3A8A] transition-colors">
@@ -227,6 +228,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               </button>
 
               <div className="mt-8 flex items-center justify-center gap-6 text-xs text-[#575A65] font-semibold">
+                <span>✓ Word & Dilekçe Dönüştürme</span>
                 <span>✓ Excel Akıllı Sütun Sığdırma</span>
                 <span>✓ Çok Sayfalı TIFF Desteği</span>
                 <span>✓ UYAP Standartlarına Uygun</span>
@@ -426,6 +428,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                   const fileName = filePath.split(/[/\\]/).pop() || filePath;
                   const ext = fileName.split('.').pop()?.toUpperCase() || '';
                   const isExcel = /\.(xlsx|xls)$/i.test(filePath);
+                  const isWord = /\.(docx|doc)$/i.test(filePath);
                   const rot = rotations[filePath] || 0;
 
                   return (
@@ -442,7 +445,9 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
 
                         {/* Canlı Küçük Resim Önizlemesi (Thumbnail / Excel İkonu) */}
                         <div className="w-12 h-12 bg-[#F4EFEA] border border-[#121316] shrink-0 overflow-hidden flex items-center justify-center relative">
-                          {isExcel ? (
+                          {isWord ? (
+                            <FileText className="w-6 h-6 text-[#1E3A8A]" />
+                          ) : isExcel ? (
                             <FileSpreadsheet className="w-6 h-6 text-[#1E3A8A]" />
                           ) : (
                             <img
@@ -457,7 +462,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className={`px-1.5 py-0.2 border text-[10px] font-black ${
-                              isExcel
+                              isWord || isExcel
                                 ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]'
                                 : 'bg-[#F4EFEA] border-[#121316] text-[#121316]'
                             }`}>
@@ -484,7 +489,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                       {/* Right: Actions (Rotate, Move Up/Down, Remove) */}
                       <div className="flex items-center gap-1 shrink-0">
                         {/* 90° Sağa Döndür (Yalnızca görseller için) */}
-                        {!isExcel && (
+                        {!isExcel && !isWord && (
                           <button
                             onClick={() => rotateFile(filePath)}
                             className="brutal-btn p-1.5 bg-[#F4EFEA] text-[#121316] hover:bg-[#121316] hover:text-white text-xs font-bold"
