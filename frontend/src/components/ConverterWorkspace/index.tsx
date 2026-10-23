@@ -216,7 +216,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               </div>
 
               <h3 className="text-2xl font-black text-[#121316] mb-2">
-                Dönüştürülecek Evrak ve Tabloları Seçin
+                Dönüştürülecek dosyayı seçin.
               </h3>
               <p className="text-sm text-[#575A65] max-w-lg mx-auto mb-6 font-medium">
                 Word (.docx, .doc), Excel (.xlsx, .xls) veya taranmış delil görsellerini (TIFF, JPEG, PNG, WEBP) seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
@@ -227,13 +227,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                 <span>Bilgisayardan Dosya Seç</span>
               </button>
 
-              <div className="mt-8 flex items-center justify-center gap-6 text-xs text-[#575A65] font-semibold">
-                <span>✓ Word & Dilekçe Dönüştürme</span>
-                <span>✓ Excel Akıllı Sütun Sığdırma</span>
-                <span>✓ Çok Sayfalı TIFF Desteği</span>
-                <span>✓ UYAP Standartlarına Uygun</span>
-                <span>✓ %100 Çevrimdışı & Yerel</span>
-              </div>
+
             </motion.div>
           </div>
         ) : (
