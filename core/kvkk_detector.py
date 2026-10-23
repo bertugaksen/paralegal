@@ -1,6 +1,6 @@
 """
 Paralegal - KVKK Sensitive Entity Detector Module (Gelişmiş Adli Hukuk Sürümü v2.1)
-UYAP dava, duruşma, karar, tensip zaptı ve icra evraklarındaki:
+UYAP dava, duruşma, karar, tensip zaptı ve icra belgelerindeki:
 - Kişi İsimleri (Taraf başlıkları, müdahiller, mirasçılar, hakim/katip, vekiller, metin içi isimler)
 - Şirket / Kurum Unvanları (A.Ş., Ltd. Şti., San. ve Tic., Holding, Banka vb.)
 - Dosya Numaraları (Esas, Karar, D.İş, Soruşturma, İcra Dosya No vb.)

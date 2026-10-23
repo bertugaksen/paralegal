@@ -119,7 +119,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({ onSelectMode }) => {
               </div>
 
               <h3 className="text-xl sm:text-2xl font-black text-[#121316] mb-2 tracking-tight">
-                Evrak & Tablo Dönüştür
+                Belge & Tablo Dönüştür
               </h3>
               <p className="text-xs sm:text-sm text-[#575A65] font-medium leading-relaxed mb-6">
                 Belgelerinizi UYAP'ın boyut sınırını aşmayacak şekilde PDF formatına dönüştürün.

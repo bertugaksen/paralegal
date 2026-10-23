@@ -142,8 +142,8 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
         setResultMessage({
           success: true,
           text: combineIntoOne
-            ? `${selectedPaths.length} adet evrak/tablo başarıyla tek bir UYAP PDF dosyasında birleştirildi.`
-            : `${selectedPaths.length} adet evrak/tablo ayrı ayrı UYAP PDF formatına dönüştürüldü.`,
+            ? `${selectedPaths.length} adet belge/tablo başarıyla tek bir UYAP PDF dosyasında birleştirildi.`
+            : `${selectedPaths.length} adet belge/tablo ayrı ayrı UYAP PDF formatına dönüştürüldü.`,
           files: res.output_paths,
         });
       } else {
@@ -179,7 +179,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
           <div className="h-5 w-[1.5px] bg-[#121316]/20" />
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-[#121316]" />
-            <h2 className="font-black text-sm tracking-tight">Evrak & Tablo Dönüştürücü (Görsel & Excel)</h2>
+            <h2 className="font-black text-sm tracking-tight">Belge & Tablo Dönüştürücü</h2>
           </div>
         </div>
 
@@ -410,7 +410,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
             <div className="brutal-card bg-[#FFFFFF] p-4">
               <div className="flex items-center justify-between border-b-2 border-[#121316] pb-2 mb-3">
                 <span className="text-xs font-black uppercase text-[#121316]">
-                  Dönüştürülecek Evraklar ({selectedPaths.length})
+                  Dönüştürülecek Belgeler ({selectedPaths.length})
                 </span>
                 <span className="text-[11px] text-[#575A65] font-semibold">
                   Sıralamayı ok butonlarıyla düzenleyebilirsiniz
@@ -530,7 +530,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
               {/* Alt Sağ: + Daha Fazla Ekle Butonu */}
               <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-[#121316]/10">
                 <span className="text-xs text-[#575A65] font-medium">
-                  Toplam {selectedPaths.length} evrak kuyrukta
+                  Toplam {selectedPaths.length} belge kuyrukta
                 </span>
                 <button
                   type="button"
@@ -546,7 +546,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
             {/* Sticky Action Dock: Hukuk Laciverti Primary CTA */}
             <div className="brutal-card p-4 bg-[#FFFFFF] flex items-center justify-between">
               <span className="text-xs text-[#575A65] font-semibold">
-                Toplam {selectedPaths.length} evrak dönüştürülmeye hazır.
+                Toplam {selectedPaths.length} belge dönüştürülmeye hazır.
               </span>
               <button
                 disabled={isConverting}

@@ -1,6 +1,6 @@
 # ⚖️ Paralegal — Avukatlar İçin Yerel KVKK ve Belge Asistanı
 
-**Paralegal**, avukatların UYAP üzerinden indirdikleri dava dilekçeleri, mahkeme kararları, tensip zaptı ve delil evraklarını **%100 yerel (offline)** olarak dönüştürmelerini ve KVKK (Kişisel Verilerin Korunması Kanunu) gereğince adli düzeyde kalıcı olarak anonimleştirmelerini sağlayan masaüstü uygulamasıdır.
+**Paralegal**, avukatların UYAP üzerinden indirdikleri dava dilekçeleri, mahkeme kararları, tensip zaptı ve delil belgelerini **%100 yerel (offline)** olarak dönüştürmelerini ve KVKK (Kişisel Verilerin Korunması Kanunu) gereğince adli düzeyde kalıcı olarak anonimleştirmelerini sağlayan masaüstü uygulamasıdır.
 
 **Avukados** tasarım sistemi, Muller yazı tipi ailesi ve sıcak krem/kömür renk paletiyle baştan tasarlanmıştır.
 
@@ -34,7 +34,7 @@ python run_paralegal.py
 - **Belge İçi 1 Tıkla Arama & Sansürleme:** Avukat arama kutusuna dilediği bir ismi veya şirketi yazarak tüm sayfalarda saniyeler içinde sansür uygulatabilir.
 - **Kalıcı Adli İmha (True Redaction):** `PyMuPDF` motoruyla sansür kutusu altındaki karakterleri, yazı tipi gliflerini ve görsel piksellerini PDF dosya kodundan **fiziksel ve kalıcı olarak siler**.
 
-### 2. 🖼️ Evrak ve Tablo Dönüştürücü (Converter)
+### 2. 🖼️ Belge ve Tablo Dönüştürücü (Converter)
 - **Görsel Formatları:** `.tiff`, `.tif`, `.jpeg`, `.jpg`, `.png`, `.bmp`, `.webp`
 - **Excel Formatları:** `.xlsx`, `.xls` (İşçilik alacak hesapları, kıdem-ihbar tabloları, banka ekstreleri, faiz tabloları, cari hesap dökümleri)
 - **Akıllı Sütun Sığdırma (Fit to Width):** Geniş hukuki tablolarda sütunların ikinci sayfaya bölünmesini kesin olarak önler. Tüm sütunları tek bir sayfa genişliğinde tutar.
