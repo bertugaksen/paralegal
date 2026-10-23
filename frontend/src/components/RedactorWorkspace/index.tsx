@@ -550,10 +550,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
               <span>Bilgisayarımdan Dosya Seç</span>
             </button>
 
-            <p className="text-xs text-[#575A65] mt-8 flex items-center justify-center gap-1.5 font-semibold">
-              <ShieldCheck className="w-4 h-4 text-[#121316]" />
-              <span>Belgeleriniz bilgisayarınızdan asla ayrılmaz, %100 yerel işlenir.</span>
-            </p>
+
           </motion.div>
         </div>
       ) : (

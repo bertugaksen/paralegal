@@ -623,14 +623,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="mt-8 pt-4 border-t-2 border-[#121316] flex items-center justify-between text-xs text-[#575A65] font-semibold">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-[#121316]" />
-            <span>Tüm işlemler yerel olarak çalışır; hiçbir veri internete aktarılmaz.</span>
-          </div>
-          <div>Paralegal Hukuk Teknolojileri</div>
-        </footer>
+
       </main>
     </div>
   );
