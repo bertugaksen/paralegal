@@ -8,9 +8,7 @@ import {
   ZoomOut,
   Save,
   Square,
-  RefreshCw,
-  Eye,
-  EyeOff
+  RefreshCw
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PDFMeta } from '../../../types';
@@ -24,8 +22,6 @@ interface ToolbarProps {
   isScanning: boolean;
   isSaving: boolean;
   drawToolActive: boolean;
-  previewMode: boolean;
-  onTogglePreviewMode: () => void;
   onPrevPage: () => void;
   onNextPage: () => void;
   onScrollToCurrentPage: () => void;
@@ -46,8 +42,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isScanning,
   isSaving,
   drawToolActive,
-  previewMode,
-  onTogglePreviewMode,
   onPrevPage,
   onNextPage,
   onScrollToCurrentPage,
@@ -153,31 +147,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               Sığdır
             </button>
           </div>
-
-          {/* Önizleme Modu Toggle (Şeffaf / Tam Sansür) */}
-          <button
-            onClick={onTogglePreviewMode}
-            className={`h-9 px-3 shrink-0 whitespace-nowrap inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer brutal-btn ${
-              previewMode
-                ? 'bg-[#1E3A8A] text-[#FFFFFF] border-2 border-[#121316] shadow-[2px_2px_0px_0px_#121316]'
-                : 'bg-[#FFFFFF] text-[#121316] hover:bg-[#F4EFEA]'
-            }`}
-            title={
-              previewMode
-                ? 'Şeffaf Önizleme Açık: Sansürlenecek metinler okunabilir durumda (Tam sansür görünümü için tıklayın)'
-                : 'Tam Sansür Görünümü Açık: Çıktıdaki siyah/beyaz kutuları gösterir (Şeffaf önizleme için tıklayın)'
-            }
-          >
-            {previewMode ? (
-              <Eye className="w-3.5 h-3.5 shrink-0 text-[#FFFFFF]" />
-            ) : (
-              <EyeOff className="w-3.5 h-3.5 shrink-0 text-[#121316]" />
-            )}
-            <span>{previewMode ? 'Şeffaf Önizleme' : 'Sansür Önizleme'}</span>
-            {previewMode && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#60A5FA] ml-0.5 animate-pulse" />
-            )}
-          </button>
 
           {/* 3. Bant Çek Butonu (Sabit Boyut, Sıfır Reflow, Görsel Durum Değişimi) */}
           <button

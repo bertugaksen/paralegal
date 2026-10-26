@@ -23,7 +23,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     isSaving, setIsSaving, saveStatus, setSaveStatus, searchTerm, setSearchTerm,
     isSearching, setIsSearching, redactionColor, setRedactionColor, redactionOverlay,
     setRedactionOverlay, sidebarTab, setSidebarTab, dataScope, setDataScope,
-    loadedPages, setLoadedPages, previewMode, setPreviewMode, hoveredRedactionId, setHoveredRedactionId,
+    loadedPages, setLoadedPages, hoveredRedactionId, setHoveredRedactionId,
     drawToolActive, setDrawToolActive, drawingPage,
     setDrawingPage, isDrawing, setIsDrawing, normStart, setNormStart, normCurrent,
     setNormCurrent, showZoomBadge, setShowZoomBadge, zoomBadgeTimeoutRef, zoomRef,
@@ -504,8 +504,6 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         isScanning={isScanning}
         isSaving={isSaving}
         drawToolActive={drawToolActive}
-        previewMode={previewMode}
-        onTogglePreviewMode={() => setPreviewMode((p) => !p)}
         onPrevPage={() => scrollToPage(Math.max(0, currentPage - 1))}
         onNextPage={() => scrollToPage(Math.min(pdfMeta ? pdfMeta.total_pages - 1 : 0, currentPage + 1))}
         onScrollToCurrentPage={() => scrollToPage(currentPage)}
@@ -653,16 +651,12 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                         let textStyle = '';
 
                         if (item.approved) {
-                          if (previewMode) {
-                            // Şeffaf Önizleme Modu: Belge üzerindeki metin açıkça okunabilir
-                            boxStyle = 'bg-amber-400/35 border-2 border-amber-600 shadow-sm hover:bg-amber-400/55';
-                            textStyle = 'text-[#121316] font-extrabold';
-                          } else if (redactionColor === 'black') {
-                            // Tam Sansür Modu: Siyah Kutu (hover ile kelimeyi incelemek için hafif şeffaflaşır)
+                          if (redactionColor === 'black') {
+                            // Siyah Kutu (hover ile kelimeyi incelemek için hafif şeffaflaşır)
                             boxStyle = 'bg-[#121316] border-[#121316] shadow-sm hover:bg-[#121316]/70';
                             textStyle = 'text-white';
                           } else {
-                            // Tam Sansür Modu: Beyaz Kutu
+                            // Beyaz Kutu
                             boxStyle = 'bg-[#FFFFFF] border-2 border-[#121316] shadow-sm hover:bg-white/70';
                             textStyle = 'text-[#121316]';
                           }
@@ -695,7 +689,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                           >
                             {item.approved ? (
                               <span className={`text-[9px] font-black tracking-wider uppercase select-none truncate px-0.5 ${textStyle}`}>
-                                {previewMode ? item.value || '[SANSÜRLENDİ]' : (redactionOverlay === 'redacted' ? '[SANSÜRLENDİ]' : '')}
+                                {redactionOverlay === 'redacted' ? '[SANSÜRLENDİ]' : ''}
                               </span>
                             ) : (
                               <div className="w-1.5 h-1.5 bg-[#1E3A8A] rounded-full" />
