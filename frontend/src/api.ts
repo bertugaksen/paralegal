@@ -70,7 +70,7 @@ export const api = {
   },
 
   getPageImageUrl(pdfPath: string, pageNum: number, dpi: number = 140): string {
-    return `${API_BASE}/api/pdf-page-image?path=${encodeURIComponent(pdfPath)}&page=${pageNum}&dpi=${dpi}&t=${Date.now()}`;
+    return `${API_BASE}/api/pdf-page-image?path=${encodeURIComponent(pdfPath)}&page=${pageNum}&dpi=${dpi}`;
   },
 
   async scanPDF(
@@ -136,7 +136,7 @@ export const api = {
   },
 
   getImageThumbnailUrl(imgPath: string, rotation: number = 0): string {
-    return `${API_BASE}/api/image-thumbnail?path=${encodeURIComponent(imgPath)}&rotation=${rotation}&t=${Date.now()}`;
+    return `${API_BASE}/api/image-thumbnail?path=${encodeURIComponent(imgPath)}&rotation=${rotation}`;
   },
 
   async convertImages(

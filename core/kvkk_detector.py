@@ -15,6 +15,11 @@ otomatik olarak derinlemesine tespit eder ve koordinatlarını bulur.
 
 import re
 from dataclasses import dataclass
+from core.scoring import (
+    NegativeFilterEngine,
+    PersonScoringEngine,
+    AddressScoringEngine,
+)
 from core.gazetteer import (
     NVI_FIRST_NAMES,
     NVI_SURNAMES,
@@ -607,26 +612,23 @@ class KVKKDetector:
                     "confidence": confidence
                 })
         else:
-            # 4. Kişi Adı (TARAF_ISMI) Sertleştirilmiş Filtreleri:
-            # Aday içinde kurum / rol isim kökleri geçiyorsa ("Davalı İdare", "Davacı Taraf", "Davalı Şirket",
-            # "İflas İdaresi", "Tasfiye Memurluğu", "İstanbul Vergi Dairesi" vb.) KESİNLİKLE KİŞİ ADI SAYILMAZ!
-            if words_set & cls.INSTITUTION_NOUNS:
+            # 4. Kişi Adı (TARAF_ISMI) - Öncelikli Negatif Filtre ve Scoring Engine
+            if NegativeFilterEngine.should_suppress_person(cleaned):
                 return
 
-            # Genel kurum kelimeleri ve hüküm fiilleri filtresi
-            if words_set & cls.INSTITUTION_KEYWORDS:
-                return
-            if any(cls.is_judgment_word(w) for w in words):
+            if words_set & cls.INSTITUTION_NOUNS or words_set & cls.INSTITUTION_KEYWORDS:
                 return
 
-            # Geçerli Ad + Soyad şartı (en az 2 kelime, her kelime en az 2 karakter)
-            if all(len(w) >= 2 for w in words):
-                found_names.add(cleaned)
-                results.append({
-                    "category": "TARAF_ISMI",
-                    "value": cleaned,
-                    "confidence": confidence
-                })
+            is_p, eval_conf, score = PersonScoringEngine.evaluate_candidate(cleaned, role_context="TARAF")
+            if not is_p:
+                return
+
+            found_names.add(cleaned)
+            results.append({
+                "category": "TARAF_ISMI",
+                "value": cleaned,
+                "confidence": eval_conf
+            })
 
     @classmethod
     def find_entities_in_text(cls, text: str, custom_keywords: Optional[List[str]] = None) -> List[Dict[str, Any]]:
@@ -726,36 +728,9 @@ class KVKKDetector:
                 "confidence": 0.99
             })
 
-        # 9. Adres Bilgileri (Başlıklı ve Serbest Metin)
-        for match in cls.ADDRESS_HEADER_PATTERN.finditer(text):
-            raw_addr = match.group(1).strip()
-            clean_addr = " ".join(raw_addr.split())
-            if len(clean_addr) >= 10:
-                results.append({
-                    "category": "ADRES",
-                    "value": clean_addr,
-                    "confidence": 0.95,
-                    "approved": True
-                })
-
-        # 9.b Serbest Metin Hiyerarşik Adres Ayrıştırıcı (Örn: 'Atatürk Mah. Fevzi Çakmak Cad. No:14/2 Kadıköy / İSTANBUL')
-        free_addr_pattern = re.compile(
-            r"\b([A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{3,35}\s+(?:Mahallesi|Mah\.|Köyü)\s+"
-            r"[A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{3,35}\s+(?:Caddesi|Cad\.|Sokağı|Sok\.|Bulvarı|Bulv\.)"
-            r"(?:\s+No\s*[:.-]?\s*\d+[a-zA-Z]?(?:/\d+)?)?"
-            r"(?:\s+(?:Kat\s*[:.-]?\s*\d+|Daire\s*[:.-]?\s*\d+))?"
-            r"(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s*/\s*[A-ZÇĞİÖŞÜa-zçğıöşü]+)?)?)\b",
-            re.IGNORECASE
-        )
-        for match in free_addr_pattern.finditer(text):
-            cand_addr = " ".join(match.group(0).split())
-            if len(cand_addr) >= 15:
-                results.append({
-                    "category": "ADRES",
-                    "value": cand_addr,
-                    "confidence": 0.88,
-                    "approved": False
-                })
+        # 9. Adres Bilgileri (Component-Based Address Scoring Engine)
+        for addr_ent in AddressScoringEngine.find_address_entities(text):
+            results.append(addr_ent)
 
         # 10. Kimlik / Aile Bilgileri (Baba Adı, Anne Adı, Doğum Tarihi/Yeri)
         for match in cls.FAMILY_IDENTITY_PATTERN.finditer(text):
@@ -805,8 +780,10 @@ class KVKKDetector:
         for match in cls.RUNNING_TEXT_NAME_PATTERN.finditer(text):
             name_cand = (match.group(1) or match.group(2) or "").strip()
             norm = tr_upper(name_cand)
-            if LegalMorphologyEngine.is_judgment_phrase(norm):
+
+            if NegativeFilterEngine.should_suppress_person(norm):
                 continue
+
             cand_words = set(norm.split())
             if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
                 continue
@@ -814,14 +791,18 @@ class KVKKDetector:
                 continue
             if any(term in norm for term in ("A.Ş", "LTD", "STI", "ŞTİ", "SANAYI", "SANAYİ", "HOLDING", "BANKA")):
                 continue
+
+            is_p, eval_conf, score = PersonScoringEngine.evaluate_candidate(name_cand, role_context="VEKIL_MUVEKKIL")
+            if not is_p:
+                continue
+
             words = name_cand.split()
-            # En az 2 kelime olmalı ve her kelime en az 2 karakter içermeli
             if len(words) >= 2 and all(len(w) >= 2 for w in words):
                 found_names.add(name_cand)
                 results.append({
                     "category": "TARAF_ISMI",
                     "value": name_cand,
-                    "confidence": 0.90
+                    "confidence": eval_conf
                 })
 
         # 13.b Metin İçi Hitaplı ve Rol Başlıklı İsimler ("Burak Bey", "Ayşe Hanım", "Tanık Mehmet Demir")
@@ -868,27 +849,35 @@ class KVKKDetector:
                             "approved": False
                         })
 
-        # 14. Tamamı Büyük Harfli İsimler (Dilekçe sonundaki vekil/taraf imzaları)
+        # 14. Tamamı Büyük Harfli İsimler (Person Scoring Engine ile Sıkı Filtreleme)
         for match in cls.ALL_CAPS_NAME_PATTERN.finditer(text):
             cand = match.group(1).strip()
             norm = tr_upper(cand)
-            if LegalMorphologyEngine.is_judgment_phrase(norm):
+
+            # Öncelikli Negatif Filtre: Mahkeme, Kurum, Usul veya Argüman ise derhal atla!
+            if NegativeFilterEngine.should_suppress_person(norm):
                 continue
+
             cand_words = set(norm.split())
-            # Resmi mahkeme ve dilekçe bölüm başlıkları KİŞİ ADI DEĞİLDİR
             if cand_words & cls.INSTITUTION_KEYWORDS or norm in cls.INSTITUTION_KEYWORDS:
                 continue
             if any(cls.is_judgment_word(w) for w in cand_words):
                 continue
             if any(term in norm for term in ("A.Ş", "LTD", "STI", "ŞTİ", "SANAYI", "SANAYİ", "HOLDING", "BANKA")):
                 continue
+
+            # Person Scoring Engine ile puanla
+            is_p, eval_conf, score = PersonScoringEngine.evaluate_candidate(cand)
+            if not is_p:
+                continue
+
             words = cand.split()
             if len(words) in (2, 3) and len(cand) >= 6 and all(len(w) >= 2 for w in words):
                 found_names.add(cand)
                 results.append({
                     "category": "TARAF_ISMI",
                     "value": cand,
-                    "confidence": 0.85
+                    "confidence": eval_conf
                 })
 
         # 15. Belge Genelinde İsim ve Şirket Yayılımı

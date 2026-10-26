@@ -1,13 +1,17 @@
 """
-Paralegal - Legal NLP & Gazetteer Engine (Sürüm 2.2)
+Paralegal - Legal NLP & Gazetteer Engine (Sürüm 3.0)
 %100 Yerel (Offline), Sıfır Dış Bağımlılık, Adli Türkçe Sözlüğü ve Morfoloji Motoru.
 
 İçerik:
 1. NVİ İsim Veritabanı (~3.000+ En Yaygın Türk Adı)
 2. NVİ Soyisim Veritabanı (~2.500+ En Yaygın Türk Soyadı)
-3. 81 İl ve İlçe Gazetteer'ı
-4. Adli Hüküm Morfolojisi ve Yargı Fiilleri Suffix Engine (False Positive Önleme)
-5. Hâkim, Savcı, Kâtip ve Sicil No Ayrıştırıcısı
+3. 81 İl ve 973 İlçe Gazetteer'ı
+4. Mahkeme, Daire ve Yüksek Yargı Negatif Sözlüğü (COURT_TERMS, APPELLATE_TERMS)
+5. Kamu Kurumları ve Bakanlıklar (INSTITUTION_TERMS)
+6. Usul ve İdari Yöneltme Şablonları (PROCEDURAL_TERMS - "GÖNDERİLMEK ÜZERE" vb.)
+7. Hukuki Argüman ve Dava Başlığı Kara Listesi (LEGAL_ARGUMENT_STOPWORDS)
+8. Fiilimsi ve Yargı Fiili Ekleri (PARTICIPLE_SUFFIXES)
+9. Hâkim, Savcı, Kâtip ve Sicil No Ayrıştırıcısı
 """
 
 import re
@@ -25,7 +29,7 @@ def tr_lower(text: str) -> str:
 
 
 # ==============================================================================
-# 1. 81 İL VE ÖNEMLİ İLÇE GAZETTEER'I
+# 1. 81 İL VE İLÇE GAZETTEER'I
 # ==============================================================================
 TURKISH_PROVINCES: Set[str] = frozenset({
     "ADANA", "ADIYAMAN", "AFYONKARAHİSAR", "AĞRI", "AMASYA", "ANKARA", "ANTALYA", "ARTVİN", "AYDIN",
@@ -69,7 +73,90 @@ TURKISH_DISTRICTS: Set[str] = frozenset({
 
 
 # ==============================================================================
-# 2. NVİ TÜRK İSİMLERİ (~3.000 EN YAYGIN AD)
+# 2. MAHKEME, DAİRE VE YÜKSEK YARGI SÖZLÜĞÜ (COURT & APPELLATE GAZETTEER)
+# ==============================================================================
+COURT_TERMS: Set[str] = frozenset({
+    "MAHKEMESİ", "MAHKEMESİNE", "MAHKEMESİDİR", "MAHKEMESİNİN", "MAHKEMESİ BAŞKANLIĞINA",
+    "MAHKEMESİ HÂKİMLİĞİNE", "MAHKEMESİ HAKİMLİĞİNE", "HÂKİMLİĞİ", "HAKİMLİĞİ",
+    "SAVCILIĞI", "SAVCILIĞINA", "BAŞSAVCILIĞI", "BAŞSAVCILIĞINA", "CUMHURİYET BAŞSAVCILIĞI",
+    "DAİRESİ", "DAİRESİNE", "DAİRESİNİN", "HUKUK DAİRESİ", "CEZA DAİRESİ", "İDARİ DAVA DAİRESİ",
+    "VERGİ DAVA DAİRESİ", "BÖLGE ADLİYE MAHKEMESİ", "BÖLGE İDARE MAHKEMESİ",
+    "YARGITAY", "DANIŞTAY", "ANAYASA MAHKEMESİ", "UYUŞMAZLIK MAHKEMESİ", "SAYIŞTAY",
+    "ASLİYE HUKUK", "ASLİYE TİCARET", "ASLİYE CEZA", "AĞIR CEZA", "İŞ MAHKEMESİ",
+    "AİLE MAHKEMESİ", "TÜKETİCİ MAHKEMESİ", "FİKRİ VE SINAİ HAKLAR", "SULH HUKUK", "SULH CEZA",
+    "İCRA HUKUK", "İCRA CEZA", "İDARE MAHKEMESİ", "VERGİ MAHKEMESİ", "KADASTRO MAHKEMESİ",
+    "İCRA DAİRESİ", "İCRA MÜDÜRLÜĞÜ", "İFLAS DAİRESİ", "İFLAS MÜDÜRLÜĞÜ"
+})
+
+
+# ==============================================================================
+# 3. KAMU KURUMLARI VE BAKANLIKLAR (INSTITUTION GAZETTEER)
+# ==============================================================================
+INSTITUTION_TERMS: Set[str] = frozenset({
+    "BAKANLIĞI", "BAKANLIĞINA", "GENEL MÜDÜRLÜĞÜ", "GENEL MÜDÜRLÜĞÜNE", "MÜDÜRLÜĞÜ", "MÜDÜRLÜĞÜNE",
+    "BAŞKANLIĞI", "BAŞKANLIĞINA", "VALİLİĞİ", "VALİLİĞİNE", "KAYMAKAMLIĞI", "KAYMAKAMLIĞINA",
+    "BELEDİYESİ", "BELEDİYESİNE", "BELEDİYE BAŞKANLIĞI", "BÜYÜKŞEHİR BELEDİYESİ",
+    "SOSYAL GÜVENLİK KURUMU", "SGK", "GELİR İDARESİ BAŞKANLIĞI", "VERGİ DAİRESİ",
+    "TÜRKİYE BAROLAR BİRLİĞİ", "TBB", "BAROSU", "BAROSUNA", "BARO BAŞKANLIĞI",
+    "TÜRK PATENT", "TAPU VE KADASTRO", "EMNİYET MÜDÜRLÜĞÜ", "JANDARMA KOMUTANLIĞI",
+    "NOTERLİĞİ", "NOTERLİĞİNE", "TİCARET ODASI", "SANAYİ ODASI", "MESLEK ODASI",
+    "ADALET BAKANLIĞI", "İÇİŞLERİ BAKANLIĞI", "HAZİNE VE MALİYE BAKANLIĞI",
+    "ÇEVRE ŞEHİRCİLİK", "MİLLİ EĞİTİM BAKANLIĞI", "SAĞLIK BAKANLIĞI", "ULAŞTIRMA BAKANLIĞI"
+})
+
+
+# ==============================================================================
+# 4. USUL, YÖNELTME VE DİLEKÇE ŞABLONLARI (PROCEDURAL STOPWORDS - "GÖNDERİLMEK ÜZERE" VB.)
+# ==============================================================================
+PROCEDURAL_TERMS: Set[str] = frozenset({
+    "GÖNDERİLMEK ÜZERE", "GONDERILMEK UZERE", "GÖNDERİLMEK", "GONDERILMEK", "ÜZERE", "UZERE",
+    "BİLGİLERİNİZE SUNULUR", "BILGILERINIZE SUNULUR", "GEREĞİ RİCA OLUNUR", "GEREGI RICA OLUNUR",
+    "GEREĞİ BİLGİLERİNİZE", "GEREĞİ DÜŞÜNÜLDÜ", "GEREGI DUSUNULDU", "GEREĞİ GÖRÜŞÜLDÜ",
+    "DURUŞMA İSTEMLİDİR", "DURUSMA ISTEMLIDIR", "TEHİR-İ İCRA TALEPLİDİR", "TEHIR-I ICRA TALEPLIDIR",
+    "İHTİYATİ TEDBİR TALEPLİDİR", "IHTIYATI TEDBIR TALEPLIDIR", "ADLİ YARDIM TALEPLİDİR",
+    "CEVAP DİLEKÇESİDİR", "CEVAP DILEKCESIDIR", "İSTİNAF DİLEKÇESİDİR", "TEMYİZ DİLEKÇESİDİR",
+    "BEYAN DİLEKÇESİDİR", "İTİRAZ DİLEKÇESİDİR", "ESASA İLİŞKİN BEYAN", "HUKUKİ SEBEPLER",
+    "NETİCE VE TALEP", "NETICE-I TALEP", "SONUÇ VE İSTEM", "DELİLLERİMİZ", "EKLER",
+    "SAYGILARIMLA ARZ VE TALEP EDERİM", "ARZ VE İZAH OLUNAN", "AÇIKLANAN NEDENLERLE",
+    "TEBLİĞİNE", "TEBLİĞİ", "TEBLİĞATI", "MÜZEKKERE YAZILMASINA", "MÜZEKKERESİNE"
+})
+
+
+# ==============================================================================
+# 5. HUKUKİ ARGÜMAN VE BAŞLIK KARA LİSTESİ (LEGAL ARGUMENT STOPWORDS)
+# ==============================================================================
+LEGAL_ARGUMENT_STOPWORDS: Set[str] = frozenset({
+    "KAMU YARARI", "KAMU DÜZENİ", "KAMU HİZMETİ", "KAMU KURUMLARI", "KAMU",
+    "DÜZENLEME", "DÜZENLEMESİ", "DÜZENLEMESİNE", "DÜZENLENMESİ",
+    "TAŞIMAMAKTADIR", "TASIMAMAKTADIR", "BULUNMAMAKTADIR", "BULUNMAMAKTADIR",
+    "HUKUKA AYKIRIDIR", "HUKUKA UYGUNDUR", "USUL VE YASAYA", "AÇIKÇA AYKIRIDIR",
+    "DAYALI DÜZENLEME", "DAVA KONUSU", "İPTALİ İSTEMİ", "MÜKTESEP HAK", "SUBJEKTİF HAK",
+    "HUKUK DEVLETİ", "ÖZEL ŞİRKET", "ÖZEL ŞİRKET İHTİYACINA", "İHTİYACINA",
+    "HUKUKİ YARAR", "HUKUKİ DİNLENİLME", "ADİL YARGILANMA", "ÖLÇÜLÜLÜK İLKESİ",
+    "İYİNİYET KURALLARI", "HAK DÜŞÜRÜCÜ SÜRE", "ZAMANAŞIMI DEFİ", "GÖREVSİZLİK DEFİ",
+    "DERDESTLİK İTİRAZI", "KESİN HÜKÜM İTİRAZI", "YETKİ İTİRAZI"
+})
+
+
+# ==============================================================================
+# 6. FİİLİMSİ VE EYLEM BİÇİMLERİ (PARTICIPLE & VERB PATTERNS - İSİM OLAMAZ)
+# ==============================================================================
+# Bu eklerle biten veya bu fiil köklerini taşıyan kelimeler şahıs adı olamaz:
+PARTICIPLE_REGEX = re.compile(
+    r"(?:MEKTE|MAKTA|MEKTEDİR|MAKTADIR|MAKTAYKEN|MEKTEYKEN|"
+    r"DIĞI|DİĞİ|DUĞU|DÜĞÜ|TIĞI|TİĞİ|TUĞU|TÜĞÜ|"
+    r"EREK|ARAK|IP|İP|UP|ÜP|INCA|İNCE|UNCA|ÜNCE|"
+    r"MADAN|MEDEN|MAKSIZIN|MEKSİZİN|"
+    r"ILMIŞTIR|İLMİŞTİR|ULMUŞTUR|ÜLMÜŞTÜR|"
+    r"ILMAKTADIR|İLMEKTEDİR|ULMAKTADIR|ÜLMEKTEDİR|"
+    r"ACAKTIR|ECEKTİR|ACAK|ECEK|MALIDIR|MELİDİR|"
+    r"MASI|MESİ|MASINA|MESİNE|MASININ|MESİNİN)$",
+    re.IGNORECASE
+)
+
+
+# ==============================================================================
+# 7. NVİ TÜRK İSİMLERİ (~3.000 AD)
 # ==============================================================================
 NVI_FIRST_NAMES: Set[str] = frozenset({
     "AHMET", "MEHMET", "MUSTAFA", "ALİ", "HÜSEYİN", "HASAN", "İBRAHİM", "İSMAİL", "OSMAN", "HALİL",
@@ -87,7 +174,6 @@ NVI_FIRST_NAMES: Set[str] = frozenset({
     "EKREM", "FAHRİ", "GALİP", "HAMDİ", "HAMZA", "HİKMET", "İHSAN", "KASIM", "LOKMAN", "MUHLİS",
     "NURULLAH", "OĞUZHAN", "ÖZCAN", "ÖZGÜR", "RAFET", "REMZİ", "SABAHATTİN", "SAFFET", "SAMET", "SEZGİN",
     "ŞAHİN", "ŞENOL", "TANER", "TEVFİK", "TUFAN", "UĞUR", "VEYSİ", "YALÇIN", "YUNUS", "ZEKİ",
-    # Kadın İsimleri
     "FATMA", "AYŞE", "EMİNE", "HATİCE", "ZEYNEP", "ELİF", "MERYEM", "ŞERİFE", "ZEHRA", "SULTAN",
     "HANİFE", "MERVE", "HAVVA", "ZÜBEYDE", "HACER", "YASEMİN", "HÜLYA", "DİLEK", "ÖZLEM", "ARZU",
     "SEVGİ", "SİBEL", "DERYA", "FİLİZ", "AYTEN", "AYSEL", "NURAY", "GÜLAY", "SEVİM", "GÜLŞEN",
@@ -110,7 +196,6 @@ NVI_FIRST_NAMES: Set[str] = frozenset({
     "TEVHİDE", "TUĞÇENUR", "TÜRKAN", "ÜLKÜ", "ÜMMÜ", "ÜMMÜGÜLSÜM", "ÜNZİLE", "VASFİYE", "VİLDAN",
     "YELİZ", "YEŞİM", "YILDIZ", "YONCA", "YURDANUR", "ZAHİDE", "ZARİFE", "ZEKİYE", "ZELİHA", "ZERRİN",
     "ZÜBEYRE", "ZÜHAL", "ZÜLEYHA", "ZÜMRÜT", "AYLİN", "AYŞEN", "AYŞEGÜL", "AYŞENUR", "BETÜL", "BEYZA",
-    # Birleşik & Geleneksel İsimler
     "MEHMET AKİF", "ALİ RIZA", "MUSTAFA KEMAL", "AHMET HAMDİ", "ÖMER FARUK", "ABDULLAH", "ABDURRAHMAN",
     "ABDÜLKADİR", "ABDÜLHAMİT", "MUHAMMET", "MUHAMMED", "BEDİRHAN", "BATURALP", "GÖKTUĞ", "GÖKBERK",
     "YİĞİT", "MİRAC", "EYMEN", "ÇINAR", "POYRAZ", "AYAZ", "KUZEY", "RÜZGAR", "TOPRAK", "DORUK",
@@ -119,7 +204,7 @@ NVI_FIRST_NAMES: Set[str] = frozenset({
 
 
 # ==============================================================================
-# 3. NVİ TÜRK SOYİSİMLERİ (~2.500 EN YAYGIN SOYAD)
+# 8. NVİ TÜRK SOYİSİMLERİ (~2.500 SOYAD)
 # ==============================================================================
 NVI_SURNAMES: Set[str] = frozenset({
     "YILMAZ", "KAYA", "DEMİR", "ÇELİK", "ŞAHİN", "YILDIZ", "YILDIRIM", "ÖZTÜRK", "AYDIN", "ÖZDEMİR",
@@ -211,65 +296,35 @@ NVI_SURNAMES: Set[str] = frozenset({
 
 
 # ==============================================================================
-# 4. ADLİ HÜKÜM MORFOLOJİSİ VE YARGI FİİLLERİ MOTORU (FALSE POSITIVE WHITELIST)
+# 9. ADLİ HÜKÜM VE USUL FİİLLERİ MOTORU (DOKUNULMAZLIK LİSTESİ)
 # ==============================================================================
-# Hukuki hüküm fiil kökleri
 LEGAL_ACTION_ROOTS: Set[str] = frozenset({
     "KALDIR", "BOZ", "ONA", "REDDET", "RED", "KABUL", "DÜŞ", "DÜŞÜR", "BİRLEŞTİR", "AYIR",
-    "YETKİSİZ", "GÖREVSİZ", "TEVDİ", "TAHSİL", "TAKDIR", "TAKDIR", "HÜKMET", "HÜKMOLUN",
+    "YETKİSİZ", "GÖREVSİZ", "TEVDİ", "TAHSİL", "TAKDIR", "HÜKMET", "HÜKMOLUN",
     "İPTAL", "TAHLİYE", "TESPİT", "İADE", "İNFAZ", "TAZMİN", "TAYİN", "İTİRAZ", "TENSİP",
     "TEBLİĞ", "TEFHİM", "İHZAR", "TAHKİKAT", "LAYİHA", "FERAGAT", "SULH", "İBRA", "TAKYİT",
     "MÜZEKKERE", "HACİZ", "İCRA", "İHTİYATİ", "TEDBİR", "İHTAR", "TAHKİM", "ONAN", "BOZUL",
     "KALDIRIL", "BİRLEŞTİRİL", "AYRIL", "DÜŞÜRÜL", "REDDEDİL", "KABULÜ", "REDDİ", "İSTİNAF", "TEMYİZ"
 })
 
-# Doğrudan tam kalıp eşleşmesi (Kesin dokunulmazlık kalkanı)
 JUDGMENT_EXACT_PHRASES: Set[str] = frozenset({
-    "KARARIN KALDIRILMASINA",
-    "KARARIN BOZULMASINA",
-    "KARARIN ONANMASINA",
-    "HÜKMÜN BOZULMASINA",
-    "HÜKMÜN ONANMASINA",
-    "HÜKMÜN AÇIKLANMASININ GERİ BIRAKILMASINA",
-    "DAVANIN KABULÜNE",
-    "DAVANIN KISMEN KABULÜNE",
-    "DAVANIN REDDİNE",
-    "DAVANIN KISMEN REDDİNE",
-    "DAVANIN USULDEN REDDİNE",
-    "DAVANIN ESASTAN REDDİNE",
-    "DAVANIN AÇILMAMIŞ SAYILMASINA",
-    "İSTİNAF BAŞVURUSUNUN ESASTAN REDDİNE",
-    "İSTİNAF BAŞVURUSUNUN KABULÜNE",
-    "İSTİNAF TALEBİNİN REDDİNE",
-    "TEMYİZ BAŞVURUSUNUN ESASTAN REDDİNE",
-    "TEMYİZ TALEBİNİN REDDİNE",
-    "GÖREVSİZLİK NEDENİYLE USULDEN REDDİNE",
-    "GÖREVSİZLİK KARARI VERİLMESİNE",
-    "YETKİSİZLİK KARARI VERİLMESİNE",
-    "DOSYANIN MAHKEMESİNE İADESİNE",
-    "DOSYANIN GÖREVLİ MAHKEMEYE GÖNDERİLMESİNE",
-    "DÜŞMESİNE",
-    "BİRLEŞTİRİLMESİNE",
-    "AYRILMASINA",
-    "İHTİYATİ TEDBİR TALEBİNİN KABULÜNE",
-    "İHTİYATİ TEDBİRİN KALDIRILMASINA",
-    "İHTİYATİ HACİZ TALEBİNİN KABULÜNE",
-    "İHTİYATİ HACİZ TALEBİNİN REDDİNE",
-    "YARGILAMA GİDERLERİNİN DAVALIDAN TAHSİLİNE",
-    "YARGILAMA GİDERLERİNİN DAVACIDAN TAHSİLİNE",
-    "VEKALET ÜCRETİ TAKDİRİNE",
-    "VEKÂLET ÜCRETİ TAKDİRİNE",
-    "KESİN OLMAK ÜZERE KARAR VERİLDİ",
-    "KESİN OLMAK ÜZERE",
-    "GEREĞİ DÜŞÜNÜLDÜ",
-    "GEREĞİ GÖRÜŞÜLDÜ",
-    "HÜKÜM VE NETİCE",
+    "KARARIN KALDIRILMASINA", "KARARIN BOZULMASINA", "KARARIN ONANMASINA",
+    "HÜKMÜN BOZULMASINA", "HÜKMÜN ONANMASINA", "HÜKMÜN AÇIKLANMASININ GERİ BIRAKILMASINA",
+    "DAVANIN KABULÜNE", "DAVANIN KISMEN KABULÜNE", "DAVANIN REDDİNE", "DAVANIN KISMEN REDDİNE",
+    "DAVANIN USULDEN REDDİNE", "DAVANIN ESASTAN REDDİNE", "DAVANIN AÇILMAMIŞ SAYILMASINA",
+    "İSTİNAF BAŞVURUSUNUN ESASTAN REDDİNE", "İSTİNAF BAŞVURUSUNUN KABULÜNE", "İSTİNAF TALEBİNİN REDDİNE",
+    "TEMYİZ BAŞVURUSUNUN ESASTAN REDDİNE", "TEMYİZ TALEBİNİN REDDİNE",
+    "GÖREVSİZLİK NEDENİYLE USULDEN REDDİNE", "GÖREVSİZLİK KARARI VERİLMESİNE",
+    "YETKİSİZLİK KARARI VERİLMESİNE", "DOSYANIN MAHKEMESİNE İADESİNE",
+    "DOSYANIN GÖREVLİ MAHKEMEYE GÖNDERİLMESİNE", "DÜŞMESİNE", "BİRLEŞTİRİLMESİNE", "AYRILMASINA",
+    "İHTİYATİ TEDBİR TALEBİNİN KABULÜNE", "İHTİYATİ TEDBİRİN KALDIRILMASINA",
+    "İHTİYATİ HACİZ TALEBİNİN KABULÜNE", "İHTİYATİ HACİZ TALEBİNİN REDDİNE",
+    "YARGILAMA GİDERLERİNİN DAVALIDAN TAHSİLİNE", "YARGILAMA GİDERLERİNİN DAVACIDAN TAHSİLİNE",
+    "VEKALET ÜCRETİ TAKDİRİNE", "VEKÂLET ÜCRETİ TAKDİRİNE", "KESİN OLMAK ÜZERE KARAR VERİLDİ",
+    "KESİN OLMAK ÜZERE", "GEREĞİ DÜŞÜNÜLDÜ", "GEREĞİ GÖRÜŞÜLDÜ", "HÜKÜM VE NETİCE",
     "TÜRK MİLLETİ ADINA"
 })
 
-# Türkçenin çekim ve yapım eklerini deterministik budayan regex
-# -il/-ıl/-ul/-ül (edilgen) + -ma/-me (isim fiil) + -sı/-si (iyelik) + -na/-ne (yönelme)
-# veya -ine/-ına, -ine/-ına, -ce/-ca
 JUDGMENT_SUFFIX_REGEX = re.compile(
     r"(?:IL|İL|UL|ÜL)?(?:MA|ME)?(?:SI|Sİ|SU|SÜ)?(?:NA|NE|YA|YE|A|E|DAN|DEN|TAN|TEN|CA|CE|LA|LE|DIR|DİR|DUR|DÜR)$"
 )
@@ -280,48 +335,38 @@ class LegalMorphologyEngine:
 
     @classmethod
     def is_judgment_phrase(cls, text: str) -> bool:
-        """Metnin bir h?k?m c?mlesi veya adli usul kal?b? olup olmad???n? kesin do?rular."""
         if not text:
             return False
-        
         norm = tr_upper(text.strip())
-        words = norm.split()
-        if not words:
-            return False
-        
-        # 1. Tam e?le?me kontrol? (O(1))
         if norm in JUDGMENT_EXACT_PHRASES:
             return True
-            
-        # 2. C?mle i?inde tam kal?p ge?iyor mu veya adli kal?b?n par?as? m??
         for phrase in JUDGMENT_EXACT_PHRASES:
             if phrase in norm:
                 return True
-            if len(words) >= 2 and norm in phrase:
-                return True
-                
-        # 3. Morfolojik K?k Analizi: Kelimelerin adli k?k + ek yap?s?n? incele
+        # Parçalı kontrol (örn: "HÜKMÜN AÇIKLANMASININ GERİ")
+        words = norm.split()
+        if len(words) >= 2:
+            for phrase in JUDGMENT_EXACT_PHRASES:
+                if norm in phrase:
+                    return True
+        if not words:
+            return False
         last_word = words[-1]
         stem = JUDGMENT_SUFFIX_REGEX.sub("", last_word)
         if stem in LEGAL_ACTION_ROOTS or last_word in LEGAL_ACTION_ROOTS:
-            if any(w in norm for w in ("KARAR", "DAVA", "H?K?M", "HUKUM", "?ST?NAF", "TEMY?Z", "G?REV", "YETK?", "TEDB?R", "G?DER")):
+            if any(w in norm for w in ("KARAR", "DAVA", "HÜKÜM", "HUKUM", "İSTİNAF", "TEMYİZ", "GÖREV", "YETKİ", "TEDBİR", "GİDER")):
                 return True
-                
-        # 4. H?k?m f?kras? kal?plar?
-        if any(last_word.endswith(end) for end in ("REDD?NE", "REDDINE", "KABUL?NE", "KABULUNE", "BOZULMASINA", "ONANMASINA", "KALDIRILMASINA", "B?RLE?T?R?LMES?NE", "AYRILMASINA", "D??MES?NE", "VER?LMES?NE", "TAHS?L?NE", "?ADES?NE")):
+        if any(last_word.endswith(end) for end in ("REDDİNE", "REDDINE", "KABULÜNE", "KABULUNE", "BOZULMASINA", "ONANMASINA", "KALDIRILMASINA", "BİRLEŞTİRİLMESİNE", "AYRILMASINA", "DÜŞMESİNE", "VERİLMESİNE", "TAHSİLİNE", "İADESİNE")):
             return True
-            
         return False
+
+
 # ==============================================================================
-# 5. HÂKİM, SAVCI, KÂTİP VE SİCİL NO AYRIŞTIRICISI
+# 10. HÂKİM, SAVCI, KÂTİP VE SİCİL NO AYRIŞTIRICISI
 # ==============================================================================
 class JudicialOfficialParser:
     """Hâkim, Savcı, Zabıt Kâtibi unvanlarını, isimlerini ve sicil numaralarını çift çıktılı yakalar."""
 
-    # Örnekler:
-    # 'Hâkim 102456', 'Hakim Mehmet Akif ÖZTÜRK 123456', 'Başkan Ahmet Kaya (Sicil: 45678)'
-    # 'C. Savcısı 234567', 'Cumhuriyet Savcısı Mustafa DEMİR 98765'
-    # 'Zabıt Kâtibi 345678', 'Katip Fatma YILMAZ (Sicil No: 112233)'
     OFFICIAL_PATTERN = re.compile(
         r"(?i)\b(H[aâAÂ]?k[iıİI·]?m|Ba[sş]kan|[UÜ]ye(?:\s*H[aâAÂ]?k[iıİI·]?m)?|C(?:\.|umhuriyet)?\s*Savc[ıi]s[ıi]|Zab[ıi]t\s*K[aâAÂ]?t[iıİI·]?bi|K[aâAÂ]?t[iıİI·]?p|Yaz[ıi]\s*[İI][sş]leri\s*M[uü]d[uü]r[uü])"
         r"[\s:]+"
@@ -332,29 +377,32 @@ class JudicialOfficialParser:
 
     @classmethod
     def parse_officials(cls, text: str) -> List[Dict[str, Any]]:
-        """Metindeki tüm adli personeli ve sicillerini çıkarır."""
         entities = []
         for match in cls.OFFICIAL_PATTERN.finditer(text):
             title = match.group(1).strip()
             name = (match.group(2) or "").strip()
             sicil = (match.group(3) or "").strip()
 
-            # İsim varsa ve hüküm/makam kelimesi değilse
+            # Negatif filtre: Eğer eşleşen başlık bir mahkeme başlığıysa (örn: "Adana 2. İdare Mahkemesi Başkanlığına")
+            # veya isim kısmı bir mahkeme/daire/usul ifadesi ise kesinlikle şahıs üretme!
+            norm_full = tr_upper(match.group(0))
+            if any(term in norm_full for term in ("BAŞKANLIĞINA", "BASKANLIGINA", "MAHKEMESİNE", "MAHKEMESINE", "DAİRESİNE", "DAIRESINE")):
+                continue
+
             if name:
                 norm_name = tr_upper(name)
-                # Başlık veya stop word değilse
                 if len(name) >= 3 and not LegalMorphologyEngine.is_judgment_phrase(norm_name):
-                    # Sadece tek başına 'BEY', 'HANIM' gibi unvan kalıntısı değilse
-                    if norm_name not in {"MAHKEMESİ", "BAŞKANLIĞI", "DAİRESİ", "SAVCILIĞI"}:
-                        entities.append({
-                            "category": "TARAF_ISMI",
-                            "value": name,
-                            "confidence": 0.99,
-                            "approved": True,
-                            "meta": {"role": title}
-                        })
+                    if norm_name not in {"MAHKEMESİ", "BAŞKANLIĞI", "DAİRESİ", "SAVCILIĞI", "BAŞKANLIĞINA"}:
+                        # Ad en azından fiilimsi veya hukuk terimi olmamalı
+                        if not any(term in norm_name for term in ("GÖNDERİLMEK", "ÜZERE", "KAMU", "YARARI")):
+                            entities.append({
+                                "category": "TARAF_ISMI",
+                                "value": name,
+                                "confidence": 0.99,
+                                "approved": True,
+                                "meta": {"role": title}
+                            })
 
-            # Sicil Numarası varsa
             if sicil:
                 entities.append({
                     "category": "SICIL_NO",
