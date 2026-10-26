@@ -48,6 +48,7 @@ interface SidebarProps {
   onScrollToPage: (pageIdx: number) => void;
   hoveredRedactionId?: string | null;
   setHoveredRedactionId?: (id: string | null) => void;
+  saveStatus?: string | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -80,6 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddToWhitelist,
   onRemoveFromWhitelist,
   onScrollToPage,
+  hoveredRedactionId,
+  setHoveredRedactionId,
+  saveStatus,
 }) => {
   const currentPageRedactions = redactions.filter((r) => r.page_number === currentPage);
   const displayedRedactions = dataScope === 'current_page' ? currentPageRedactions : redactions;
