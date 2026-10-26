@@ -46,6 +46,8 @@ interface SidebarProps {
   onAddToWhitelist: (value: string, e: React.MouseEvent) => void;
   onRemoveFromWhitelist: (value: string) => void;
   onScrollToPage: (pageIdx: number) => void;
+  hoveredRedactionId?: string | null;
+  setHoveredRedactionId?: (id: string | null) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -232,6 +234,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <div
                     key={item.id}
+                    onMouseEnter={() => setHoveredRedactionId?.(item.id)}
+                    onMouseLeave={() => setHoveredRedactionId?.(null)}
                     onClick={() => {
                       onToggleRedactionApproval(item.id);
                       if (dataScope === 'all_pages') {
@@ -242,7 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       item.approved
                         ? 'border-[#121316] bg-[#FFFFFF] brutal-shadow-sm'
                         : 'border-dashed border-[#121316]/40 bg-[#F4EFEA] opacity-60 hover:opacity-100'
-                    }`}
+                    } ${hoveredRedactionId === item.id ? 'ring-2 ring-[#1E3A8A] border-[#1E3A8A]' : ''}`}
                   >
                     <div className="min-w-0 flex-1 pr-2">
                       <div className="flex items-center gap-1.5 mb-1">

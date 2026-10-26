@@ -33,6 +33,8 @@ export function useRedactorState() {
   const [dataScope, setDataScope] = useState<'current_page' | 'all_pages'>('current_page');
   const [loadedPages, setLoadedPages] = useState<Record<number, boolean>>({});
 
+  const [previewMode, setPreviewMode] = useState<boolean>(false);
+  const [hoveredRedactionId, setHoveredRedactionId] = useState<string | null>(null);
   const [drawToolActive, setDrawToolActive] = useState<boolean>(false);
   const [drawingPage, setDrawingPage] = useState<number | null>(null);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -70,6 +72,7 @@ export function useRedactorState() {
     saveStatus, setSaveStatus, searchTerm, setSearchTerm, isSearching, setIsSearching,
     redactionColor, setRedactionColor, redactionOverlay, setRedactionOverlay,
     sidebarTab, setSidebarTab, dataScope, setDataScope, loadedPages, setLoadedPages,
+    previewMode, setPreviewMode, hoveredRedactionId, setHoveredRedactionId,
     drawToolActive, setDrawToolActive, drawingPage, setDrawingPage,
     isDrawing, setIsDrawing, normStart, setNormStart, normCurrent, setNormCurrent,
     showZoomBadge, setShowZoomBadge, zoomBadgeTimeoutRef, zoomRef,

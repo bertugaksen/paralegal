@@ -279,7 +279,9 @@ class KVKKDetector:
         "MÜNFERİDEN", "MUNFERIDEN", "MÜŞTEREKEN", "MUSTEREKEN",
         "SAYGILARIMLA", "ARZ", "EDERİM", "EDERIM", "EDERİZ", "EDERIZ",
         "SUNULUR", "BİLGİLERİNİZE", "BILGILERINIZE",
-        "KABULÜNE", "REDDİNE", "İADESİNE", "ONANMASINA", "BOZULMASINA"
+        "KABULÜNE", "REDDİNE", "İADESİNE", "ONANMASINA", "BOZULMASINA", 
+        "ÜZERE", "UZERE", "DAYALI", "GÖNDERİLMEK", "GONDERILMEK", 
+        "KAMU", "YARARI", "ALINMASINA", "VERİLMESİNE", "EDİLMESİNE"
     }
 
     # Rol başlıklarından hemen sonra gelen kurumsal/genel niteleyiciler (Kesinlikle kişi adı değildir)
@@ -486,6 +488,8 @@ class KVKKDetector:
             "BOZULMASI", "ONANMASI", "KALDIRILMASI", "BİRLEŞTİRİLMESİ", "DÜŞÜRÜLMESİ",
             "ĞİNE", "GINE", "LİĞİNE", "LIGINE",
             "MİŞTİR", "MISTIR", "MIŞTIR", "MÜŞTÜR",
+            "HÜKMOLUNDU", "HÜKMOLUNMASINA", "VERİLDİ", "VERİLMESİNE", "MAKTADIR", "MEKTEDİR", "MAKTADIRLAR", "MEKTEDİRLER",
+            "MAMAKTADIR", "MEMEKTEDİR", "MAZ", "MEZ", "MAMIŞTIR",
             "HÜKMOLUNDU", "HÜKMOLUNMASINA", "VERİLDİ", "VERİLMESİNE"
         )
         return any(w.endswith(s) for s in suffixes)
