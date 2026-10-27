@@ -21,6 +21,9 @@ export interface PDFMeta {
   filename: string;
   total_pages: number;
   pages: PageMeta[];
+  is_scanned?: boolean;
+  has_text_layer?: boolean;
+  total_chars?: number;
 }
 
 export interface FilterSettings {
@@ -43,3 +46,10 @@ export interface ExcelAnalysis {
   col_count?: number;
   [key: string]: any;
 }
+
+export interface FileSizeInfo {
+  path: string;
+  size_bytes: number;
+  size_formatted: string;
+}
+

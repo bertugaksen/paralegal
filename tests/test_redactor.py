@@ -211,6 +211,156 @@ class TestPDFRedactor:
         assert check["all_cleared"] is True
         assert check["leaked_words"] == []
 
+    def test_verify_redacted_pdf_no_false_positive_substrings(self, tmp_path):
+        """
+        Doğrulama motoru 'ALİ' kelimesini ararken 'MALİ', 'MALİYE', 'KALİTE', 'TATİL', 'VALİ'
+        gibi alt dize (substring) içeren kelimeleri sahte sızıntı saymamalıdır.
+        """
+        pdf_path = str(tmp_path / "mali_valilik.pdf")
+        doc = fitz.open()
+        p = doc.new_page()
+        font = fitz.Font(fontfile="C:/Windows/Fonts/arial.ttf") if os.path.exists("C:/Windows/Fonts/arial.ttf") else fitz.Font("helv")
+        tw = fitz.TextWriter(p.rect)
+        tw.append((50, 50), "Şirketimiz MALİ ve MALİYE denetimi, VALİ onayı, KALİTE standardı altında TATİL dönemindedir.", font=font)
+        tw.write_text(p)
+        doc.save(pdf_path)
+        doc.close()
+
+        # 'ALİ' ve 'CAN' bu belgede alt dize olarak geçse de bağımsız kelime olarak bulunmaz -> Sahte sızıntı ÜRETMEMELİ
+        check = PDFRedactor.verify_redacted_pdf(
+            pdf_path,
+            sensitive_words=["ALİ", "CAN"]
+        )
+        assert check["all_cleared"] is True
+        assert check["leaked_words"] == []
+
+        # Ancak belgede gerçekten geçen 'VALİ' ve 'MALİ' arandığında sızıntı olarak doğru yakalanmalıdır
+        check_real = PDFRedactor.verify_redacted_pdf(
+            pdf_path,
+            sensitive_words=["VALİ", "MALİ"]
+        )
+        assert check_real["all_cleared"] is False
+        assert "VALİ" in check_real["leaked_words"]
+        assert "MALİ" in check_real["leaked_words"]
+
+    def test_verify_redacted_pdf_exact_word_match_turkish_cases(self, tmp_path):
+        """
+        'ALİ' kelimesi bağımsız bir kelime olarak geçtiğinde (farklı büyük/küçük harf varyasyonları
+        ve noktalama işaretleri dahil) sızıntı olarak tespit edilmelidir.
+        """
+        pdf_path = str(tmp_path / "leak_test.pdf")
+        doc = fitz.open()
+        p = doc.new_page()
+        font = fitz.Font(fontfile="C:/Windows/Fonts/arial.ttf") if os.path.exists("C:/Windows/Fonts/arial.ttf") else fitz.Font("helv")
+        tw = fitz.TextWriter(p.rect)
+        tw.append((50, 50), "Sayın Ali Kaya ile MALİ MÜŞAVİR görüşmesi yapıldı.", font=font)
+        tw.write_text(p)
+        doc.save(pdf_path)
+        doc.close()
+
+        # 'ALİ' bağımsız kelime olarak var -> sızıntı tespit edilmeli
+        check1 = PDFRedactor.verify_redacted_pdf(pdf_path, sensitive_words=["ALİ"])
+        assert check1["all_cleared"] is False
+        assert "ALİ" in check1["leaked_words"]
+
+        # 'KAYA' bağımsız kelime olarak var -> sızıntı tespit edilmeli
+        check2 = PDFRedactor.verify_redacted_pdf(pdf_path, sensitive_words=["KAYA"])
+        assert check2["all_cleared"] is False
+        assert "KAYA" in check2["leaked_words"]
+
+        # 'MALİ' sızıntı değil ama listede aranmıyorsa ALİ'den dolayı sahte alarm vermemeli
+        check3 = PDFRedactor.verify_redacted_pdf(pdf_path, sensitive_words=["ALİCE", "VALİ"])
+        assert check3["all_cleared"] is True
+        assert check3["leaked_words"] == []
+
+    def test_verify_redacted_pdf_turkish_apostrophe_suffixes(self, tmp_path):
+        """
+        'ALİ' ve 'ALİ'NİN' gibi kesme işaretli (hem ASCII ' hem tipografik ’) kelimelerin
+        sızıntı denetiminde doğru şekilde yakalandığını doğrular.
+        """
+        font = fitz.Font(fontfile="C:/Windows/Fonts/arial.ttf") if os.path.exists("C:/Windows/Fonts/arial.ttf") else fitz.Font("helv")
+
+        # 1. Senaryo: ASCII kesme işaretli metin (ALİ'NİN ve Ali'nin)
+        pdf_ascii = str(tmp_path / "apostrophe_ascii.pdf")
+        doc1 = fitz.open()
+        p1 = doc1.new_page()
+        tw1 = fitz.TextWriter(p1.rect)
+        tw1.append((50, 50), "Davacı ALİ'NİN beyanına göre diğer taraf Ali'nin aracını teslim etmiştir.", font=font)
+        tw1.write_text(p1)
+        doc1.save(pdf_ascii)
+        doc1.close()
+
+        # 'ALİ' kök kelime olarak arandığında sızıntı yakalanmalı
+        res1 = PDFRedactor.verify_redacted_pdf(pdf_ascii, sensitive_words=["ALİ", "Ali"])
+        assert res1["all_cleared"] is False
+        assert "ALİ" in res1["leaked_words"]
+        assert "Ali" in res1["leaked_words"]
+
+        # 'ALİ'NİN' doğrudan ekli haliyle arandığında da sızıntı yakalanmalı
+        res2 = PDFRedactor.verify_redacted_pdf(pdf_ascii, sensitive_words=["ALİ'NİN", "Ali'nin"])
+        assert res2["all_cleared"] is False
+        assert "ALİ'NİN" in res2["leaked_words"]
+        assert "Ali'nin" in res2["leaked_words"]
+
+        # 2. Senaryo: Tipografik kıvrık kesme işaretli metin (ALİ’NİN ve Ali’nin)
+        pdf_curly = str(tmp_path / "apostrophe_curly.pdf")
+        doc2 = fitz.open()
+        p2 = doc2.new_page()
+        tw2 = fitz.TextWriter(p2.rect)
+        tw2.append((50, 50), "Davacı ALİ’NİN beyanına göre Ali’nin hesabı sorgulandı.", font=font)
+        tw2.write_text(p2)
+        doc2.save(pdf_curly)
+        doc2.close()
+
+        # ASCII kesme işareti ile aransa dahi tipografik kesme işaretli sızıntı yakalanmalı
+        res3 = PDFRedactor.verify_redacted_pdf(pdf_curly, sensitive_words=["ALİ'NİN", "Ali'nin", "ALİ"])
+        assert res3["all_cleared"] is False
+        assert "ALİ'NİN" in res3["leaked_words"]
+        assert "Ali'nin" in res3["leaked_words"]
+        assert "ALİ" in res3["leaked_words"]
+
+    def test_verify_redacted_pdf_multi_word_phrases(self, tmp_path):
+        """
+        Çoklu kelimelerin ('Ahmet Yılmaz', 'İstanbul Barosu') büyük/küçük harf,
+        birden fazla boşluk ve satır sonu (newline) eşleşmelerini doğrular.
+        """
+        font = fitz.Font(fontfile="C:/Windows/Fonts/arial.ttf") if os.path.exists("C:/Windows/Fonts/arial.ttf") else fitz.Font("helv")
+
+        pdf_path = str(tmp_path / "multi_word.pdf")
+        doc = fitz.open()
+        p = doc.new_page()
+        tw = fitz.TextWriter(p.rect)
+        tw.append((50, 50), "Müvekkil Ahmet   Yılmaz,\nİstanbul   Barosu levhasına kayıtlıdır.", font=font)
+        tw.write_text(p)
+        doc.save(pdf_path)
+        doc.close()
+
+        # Normal ve farklı harf boyutlarında arama
+        res = PDFRedactor.verify_redacted_pdf(
+            pdf_path,
+            sensitive_words=[
+                "Ahmet Yılmaz",
+                "AHMET YILMAZ",
+                "İstanbul Barosu",
+                "İSTANBUL BAROSU",
+                "istanbul barosu"
+            ]
+        )
+        assert res["all_cleared"] is False
+        assert "Ahmet Yılmaz" in res["leaked_words"]
+        assert "AHMET YILMAZ" in res["leaked_words"]
+        assert "İstanbul Barosu" in res["leaked_words"]
+        assert "İSTANBUL BAROSU" in res["leaked_words"]
+        assert "istanbul barosu" in res["leaked_words"]
+
+        # Belgede olmayan çoklu kelimeler sahte alarm üretmemeli
+        res_clean = PDFRedactor.verify_redacted_pdf(
+            pdf_path,
+            sensitive_words=["Mehmet Yılmaz", "Ankara Barosu"]
+        )
+        assert res_clean["all_cleared"] is True
+        assert res_clean["leaked_words"] == []
+
     def test_apply_redactions_nonexistent_pdf_raises(self, tmp_path):
         """Test FileNotFoundError is raised when target PDF does not exist."""
         nonexistent = str(tmp_path / "not_found.pdf")

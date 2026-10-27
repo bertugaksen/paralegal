@@ -126,12 +126,16 @@ class RouteHandler:
             doc = fitz.open(pdf_path)
             total_pages = len(doc)
             pages_meta = [{"page": p, "width": doc[p].rect.width, "height": doc[p].rect.height} for p in range(total_pages)]
+            text_analysis = KVKKDetector.analyze_document_text_layer(doc)
             doc.close()
             self.server._send_json({
                 "path": pdf_path,
                 "filename": Path(pdf_path).name,
                 "total_pages": total_pages,
-                "pages": pages_meta
+                "pages": pages_meta,
+                "is_scanned": text_analysis["is_scanned"],
+                "has_text_layer": text_analysis["has_text_layer"],
+                "total_chars": text_analysis["total_chars"]
             })
         except Exception as e:
             self.server._send_json({"error": str(e)}, 500)
@@ -147,6 +151,7 @@ class RouteHandler:
 
         try:
             doc = fitz.open(pdf_path)
+            text_analysis = KVKKDetector.analyze_document_text_layer(doc)
             all_entities = []
             for page_idx in range(len(doc)):
                 page_ents = KVKKDetector.scan_pdf_page(
@@ -160,7 +165,13 @@ class RouteHandler:
                         "rect": [e.rect[0], e.rect[1], e.rect[2], e.rect[3]], "confidence": e.confidence, "approved": e.approved
                     })
             doc.close()
-            self.server._send_json({"entities": all_entities, "total": len(all_entities)})
+            self.server._send_json({
+                "entities": all_entities,
+                "total": len(all_entities),
+                "is_scanned": text_analysis["is_scanned"],
+                "has_text_layer": text_analysis["has_text_layer"],
+                "total_chars": text_analysis["total_chars"]
+            })
         except Exception as e:
             self.server._send_json({"error": str(e)}, 500)
 
@@ -305,6 +316,144 @@ class RouteHandler:
         except Exception as e:
             self.server._send_json({"error": str(e)}, 500)
 
+    def upload_file(self, path: str, data: Dict[str, Any]):
+        """Sürükle-bırak veya dosya seçiminden gelen dosyaları geçici dizine kaydeder."""
+        existing_path = data.get("path")
+        if existing_path and os.path.exists(existing_path):
+            self.server._send_json({
+                "path": existing_path,
+                "filePath": existing_path,
+                "filename": Path(existing_path).name
+            })
+            return
+
+        filename = data.get("filename") or data.get("name") or "uploaded_file"
+        base64_data = data.get("content") or data.get("data") or data.get("base64")
+        raw_body = data.get("_raw_body")
+
+        if not base64_data and not raw_body:
+            self.server._send_json({"error": "Dosya içeriği veya yolu sağlanmadı"}, 400)
+            return
+
+        try:
+            import base64
+            import tempfile
+            import uuid
+
+            if raw_body:
+                file_bytes = raw_body
+            else:
+                if isinstance(base64_data, str):
+                    if "," in base64_data:
+                        base64_data = base64_data.split(",", 1)[1]
+                    clean_b64 = base64_data.strip().replace("\n", "").replace("\r", "").replace(" ", "")
+                    file_bytes = base64.b64decode(clean_b64, validate=True)
+                else:
+                    file_bytes = base64.b64decode(base64_data)
+
+            upload_dir = os.path.join(tempfile.gettempdir(), "paralegal_uploads")
+            os.makedirs(upload_dir, exist_ok=True)
+
+            clean_name = Path(filename).name
+            if not clean_name:
+                clean_name = "dosya.bin"
+
+            stem = Path(clean_name).stem
+            suffix = Path(clean_name).suffix
+            unique_name = f"{stem}_{uuid.uuid4().hex[:8]}{suffix}"
+            target_path = os.path.join(upload_dir, unique_name)
+
+            with open(target_path, "wb") as f:
+                f.write(file_bytes)
+
+            self.server._send_json({
+                "path": target_path,
+                "filePath": target_path,
+                "filename": clean_name
+            })
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
+    @staticmethod
+    def cleanup_temp_uploads(max_age_seconds: int = 3600) -> int:
+        """
+        Gecici yukleme dizinindeki (paralegal_uploads) dosyalari temizler.
+        max_age_seconds: 0 ise tumunu, >0 ise belirtilen saniyeden eski dosyalari siler.
+        Dondurur: Silinen dosya adedi.
+        """
+        import tempfile
+        import time
+        upload_dir = os.path.join(tempfile.gettempdir(), "paralegal_uploads")
+        if not os.path.exists(upload_dir):
+            return 0
+
+        deleted_count = 0
+        now = time.time()
+        for fname in os.listdir(upload_dir):
+            file_path = os.path.join(upload_dir, fname)
+            try:
+                if os.path.isfile(file_path):
+                    if max_age_seconds <= 0 or (now - os.path.getmtime(file_path)) >= max_age_seconds:
+                        os.remove(file_path)
+                        deleted_count += 1
+            except Exception:
+                pass
+        return deleted_count
+
+    def clean_temp_uploads(self, path: str, data: Dict[str, Any]):
+        """Gecici yukleme dizinini temizler."""
+        try:
+            max_age = int(data.get("max_age_seconds", 0))
+            deleted = self.cleanup_temp_uploads(max_age)
+            self.server._send_json({"success": True, "deleted_count": deleted})
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
+    @staticmethod
+    def format_file_size(size_bytes: int) -> str:
+        """Dosya boyutunu okunabilir formata donusturur (or. 850 KB, 2.4 MB)."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            kb = size_bytes / 1024
+            if kb >= 100:
+                return f"{round(kb)} KB"
+            formatted = f"{kb:.1f}"
+            return f"{formatted[:-2]} KB" if formatted.endswith(".0") else f"{formatted} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            mb = size_bytes / (1024 * 1024)
+            return f"{mb:.1f} MB"
+        else:
+            gb = size_bytes / (1024 * 1024 * 1024)
+            return f"{gb:.1f} GB"
+
+    def file_sizes(self, path: str, data: Dict[str, Any]):
+        """Verilen dosya yollari icin diskteki dosya boyutlarini dondurur."""
+        try:
+            paths = data.get("paths", [])
+            if not isinstance(paths, list):
+                self.server._send_json({"error": "'paths' bir liste olmalıdır."}, 400)
+                return
+
+            results = []
+            for p in paths:
+                size_bytes = 0
+                if isinstance(p, str) and os.path.exists(p) and os.path.isfile(p):
+                    try:
+                        size_bytes = os.path.getsize(p)
+                    except Exception:
+                        size_bytes = 0
+
+                results.append({
+                    "path": p,
+                    "size_bytes": size_bytes,
+                    "size_formatted": self.format_file_size(size_bytes),
+                })
+
+            self.server._send_json(results)
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
     def get_get_routes(self):
         return {
             "/api/health": self.health,
@@ -327,4 +476,9 @@ class RouteHandler:
             "/api/convert-excel": self.convert_excel,
             "/api/convert-word": self.convert_word,
             "/api/convert-images": self.convert_images,
+            "/api/upload-file": self.upload_file,
+            "/api/upload_file": self.upload_file,
+            "/api/clean-temp-uploads": self.clean_temp_uploads,
+            "/api/file-sizes": self.file_sizes,
+            "/api/file_sizes": self.file_sizes,
         }

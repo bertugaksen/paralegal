@@ -15,6 +15,8 @@ otomatik olarak derinlemesine tespit eder ve koordinatlarını bulur.
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
+import pymupdf as fitz
 from core.scoring import (
     NegativeFilterEngine,
     PersonScoringEngine,
@@ -470,6 +472,62 @@ class KVKKDetector:
         r"S[İI]GORTA|FABR[İI]KA|LOJ[İI]ST[İI]K|İNŞAAT|INSAAT|OTOMOT[İI]V)(?=[\s,;:.?!]|$)",
         re.IGNORECASE
     )
+
+    @classmethod
+    def analyze_document_text_layer(cls, doc: Any) -> Dict[str, Any]:
+        """
+        PDF belgesinin metin katmanını analiz eder ve taranmış (OCR'sız görsel evrak) olup olmadığını tespit eder.
+
+        Kriterler:
+        - PDF açıldığında her sayfanın metin uzunluğu len(page.get_text().strip()) kontrol edilir.
+        - Eğer toplam karakter sayısı sayfa sayısına bölündüğünde sayfa başına 15 karakterin altındaysa
+          veya belgedeki sayfaların %80'inden fazlasında hiç metin yoksa:
+          is_scanned: True, has_text_layer: False
+        - Aksi halde:
+          is_scanned: False, has_text_layer: True
+        """
+        should_close = False
+        if isinstance(doc, (str, Path)):
+            doc = fitz.open(str(doc))
+            should_close = True
+
+        try:
+            total_pages = len(doc)
+            if total_pages == 0:
+                return {
+                    "is_scanned": True,
+                    "has_text_layer": False,
+                    "total_chars": 0,
+                    "empty_pages": 0,
+                    "total_pages": 0,
+                    "avg_chars_per_page": 0.0,
+                }
+
+            total_chars = 0
+            empty_pages_count = 0
+
+            for page in doc:
+                text_len = len(page.get_text().strip())
+                total_chars += text_len
+                if text_len == 0:
+                    empty_pages_count += 1
+
+            avg_chars = total_chars / total_pages
+            empty_ratio = empty_pages_count / total_pages
+
+            is_scanned = bool((avg_chars < 15) or (empty_ratio > 0.8))
+
+            return {
+                "is_scanned": is_scanned,
+                "has_text_layer": not is_scanned,
+                "total_chars": int(total_chars),
+                "empty_pages": int(empty_pages_count),
+                "total_pages": int(total_pages),
+                "avg_chars_per_page": round(float(avg_chars), 2),
+            }
+        finally:
+            if should_close and doc:
+                doc.close()
 
     @classmethod
     def is_judgment_word(cls, word: str) -> bool:

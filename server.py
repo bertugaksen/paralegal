@@ -4,6 +4,7 @@ Paralegal - Local High-Performance API Server
 Frontend (React + Tailwind) ile Python motoru (PyMuPDF, KVKK Detector, Converter) arasında köprü kurar.
 """
 
+import sys
 import os
 import json
 import urllib.parse
@@ -14,7 +15,14 @@ from typing import Dict, Any
 
 from core.routes import RouteHandler
 
-DIST_DIR = Path(__file__).parent / "frontend" / "dist"
+def get_base_dir() -> Path:
+    """PyInstaller dondurulmuş modu veya geliştirme ortamı temel dizinini döndürür."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+BASE_DIR = get_base_dir()
+DIST_DIR = BASE_DIR / "frontend" / "dist"
 
 class ParalegalAPIHandler(SimpleHTTPRequestHandler):
     """Paralegal yerel API ve statik dosya sunucusu."""
@@ -23,7 +31,11 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
         self.router = RouteHandler(self)
         self.get_routes = self.router.get_get_routes()
         self.post_routes = self.router.get_post_routes()
-        super().__init__(*args, directory=str(DIST_DIR) if DIST_DIR.exists() else str(Path(__file__).parent), **kwargs)
+        super().__init__(*args, directory=str(DIST_DIR) if DIST_DIR.exists() else str(BASE_DIR), **kwargs)
+
+    def log_message(self, format, *args):
+        """PyInstaller --noconsole modunda stdout/stderr None olabileceğinden güvenli tutulur."""
+        pass
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -49,7 +61,10 @@ class ParalegalAPIHandler(SimpleHTTPRequestHandler):
         if content_len == 0:
             return {}
         body = self.rfile.read(content_len)
-        return json.loads(body.decode("utf-8"))
+        try:
+            return json.loads(body.decode("utf-8"))
+        except Exception:
+            return {"_raw_body": body}
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)

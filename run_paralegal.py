@@ -10,10 +10,23 @@ import threading
 import time
 from pathlib import Path
 
-# Paralegal ana dizinini Python yoluna ekle
-CURRENT_DIR = Path(__file__).resolve().parent
-if str(CURRENT_DIR) not in sys.path:
-    sys.path.insert(0, str(CURRENT_DIR))
+# PyInstaller --noconsole modunda stdout/stderr None olabilir, çökmeyi engelle
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
+def get_base_dir() -> Path:
+    """PyInstaller dondurulmuş modu veya geliştirme ortamı temel dizinini döndürür."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+BASE_DIR = get_base_dir()
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+CURRENT_DIR = BASE_DIR
 
 from server import start_server
 
@@ -46,17 +59,13 @@ def run_desktop_app():
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
 
-    # Yüksek DPI ekranlar için ölçeklendirme
-    if hasattr(Qt, "AA_EnableHighDpiScaling"):
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    if hasattr(Qt, "AA_UseHighDpiPixmaps"):
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-
     app = QApplication(sys.argv)
     app.setApplicationName("Paralegal")
     app.setOrganizationName("ParalegalTech")
 
-    icon_path = CURRENT_DIR / "assets" / "paralegal_icon.png"
+    ico_path = CURRENT_DIR / "assets" / "paralegal_icon.ico"
+    png_path = CURRENT_DIR / "assets" / "paralegal_icon.png"
+    icon_path = ico_path if ico_path.exists() else png_path
     if icon_path.exists():
         app_icon = QIcon(str(icon_path))
         app.setWindowIcon(app_icon)
@@ -100,7 +109,12 @@ def run_desktop_app():
             self.web_view.load(QUrl(target_url))
 
         def closeEvent(self, event):
-            # Kapanırken yerel sunucuyu temiz şekilde sonlandır
+            # Kapanırken geçici yüklemeleri temizle ve yerel sunucuyu sonlandır
+            try:
+                from core.routes import RouteHandler
+                RouteHandler.cleanup_temp_uploads(0)
+            except Exception:
+                pass
             try:
                 server.shutdown()
             except Exception:
@@ -112,6 +126,11 @@ def run_desktop_app():
     main_window.show()
 
     ret = app.exec()
+    try:
+        from core.routes import RouteHandler
+        RouteHandler.cleanup_temp_uploads(0)
+    except Exception:
+        pass
     try:
         server.shutdown()
     except Exception:

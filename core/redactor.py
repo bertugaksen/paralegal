@@ -6,6 +6,7 @@ ilgili karakterleri, vektörleri ve resim piksellerini kalıcı olarak imha eder
 """
 
 import os
+import re
 from typing import List, Tuple, Optional, Dict, Any
 import pymupdf as fitz
 
@@ -255,13 +256,23 @@ class PDFRedactor:
             all_text += " " + page.get_text()
         doc.close()
 
+        # Kesme işareti varyasyonlarını (', ’, ʼ, ‘, `, ´) standartlaştır
+        norm_all_text = re.sub(r"['’ʼ‘`´]", "'", all_text)
+
         leaked = []
         for word in sensitive_words:
             if not word or len(word.strip()) < 3:
                 continue
             # Eğer kelime hala düz metin olarak okunabiliyorsa sızıntı var demektir
             clean_word = word.strip()
-            if clean_word in all_text:
+            norm_word = re.sub(r"['’ʼ‘`´]", "'", clean_word)
+            # Boşlukları esnek eşleştirme için \s+ yap ve Türkçe uyumlu sınır kontrolü sağla
+            parts = [re.escape(p) for p in norm_word.split()]
+            escaped_word = r"\s+".join(parts)
+            prefix = r"(?<!\w)" if re.match(r"^\w", norm_word) else ""
+            suffix = r"(?!\w)" if re.search(r"\w$", norm_word) else ""
+            pattern = rf"{prefix}{escaped_word}{suffix}"
+            if re.search(pattern, norm_all_text, flags=re.IGNORECASE):
                 leaked.append(clean_word)
 
         return {

@@ -1,0 +1,78 @@
+================================================================================
+PARALEGAL - YEREL HUKUK VE DOKUMAN ASISTANI
+Kullanim ve Hizli Baslangic Kilavuzu
+================================================================================
+
+1. NEDIR BU PROGRAM?
+---------------------
+Paralegal, hukuk burolari ve avukatlar icin ozel olarak tasarlanmis; PDF belgelerindeki
+kisisel verileri (TCKN, IBAN, Ad-Soyad, Telefon, Plaka vb.) yapay zeka ve kural motoruyla
+tespit edip tek tikla kalici olarak sansurleyen (anonimlestiren) ve Word/Excel belgelerini
+UYAP uyumlu PDF'e donusturen profesyonel bir masaustu uygulamasidir.
+
+
+2. %100 GIZLILIK VE CEVRIMDISI CALISMA GUWENCESI
+------------------------------------------------
+- Paralegal kesinlikle internete baglanmaz, hicbir sunucuya veri gondermez.
+- Telemetri veya veri toplama kodu icermez.
+- Bilgisayarinizin internet baglantisini keserek, hatta ucuk modunda dahi
+  programi tam fonksiyonel olarak guvenle kullanabilirsiniz.
+- Tum sansurleme ve donusturme islemleri dogrudan sizin bilgisayarinizin RAM ve
+  islemcisinde gerceklesir.
+
+
+3. PROGRAMI CALISTIRMA
+-----------------------
+- "Paralegal.exe" dosyasina cift tiklamaniz yeterlidir.
+- Bilgisayariniza Python, Node.js veya herhangi bir ek yazilim kurmaniza GEREK YOKTUR.
+
+* ONEMLI NOT (Windows SmartScreen Uyarisi):
+  Program henuz yillik ucretli kurumsal dijital sertifika ile imzalanmadigi icin,
+  Windows ilk calistirmada:
+  "Windows kisisel bilgisayarinizi korudu" mavi uyari ekrani cikarabilir.
+  Bu durumda sirasiyla:
+    1) "Ek bilgi" yazisina tiklayin.
+    2) Sag altta beliren "Yine de calistir" butonuna basin.
+  (Bu islem yalnizca ilk calistirmada bir defa yapilir).
+
+* ILK ACILIS SURESI:
+  Paralegal, tum calisma bilesenlerini tek bir dosyada tasidigi icin cift
+  tiklandiktan sonra acilmasi disk hiziniza bagli olarak 5-8 saniye surebilir.
+  Lutfen pencere acilana kadar bekleyiniz.
+
+
+4. TEMEL OZELLIKLER VE KULLANIM
+-------------------------------
+A) KVKK / PDF SANSURLEME MODULU:
+   - "PDF Sec" butonuna basarak veya PDF dosyanizi surukleyip birakarak yukleyin.
+   - Program otomatik olarak TCKN, IBAN, Ad-Soyad, Plaka, Adres vb. kisisel verileri
+     tespit eder ve ekranda cerceve icine alir.
+   - Sag paneldeki filtre butonlariyla (TCKN, IBAN, Ad-Soyad vb.) filtreleme yapabilir,
+     onaylamak istediginiz sansurleri secip cikarabilirsiniz.
+   - "Kutuyu Duzenle" araci ile sansur kutularini kosedeki tutamaklardan tutup
+     genisletebilir veya tasiyabilirsiniz.
+   - "Secili Sansurleri Uygula" dediginizde veriler PDF uzerinden KALICI VE GERI
+     DONDURULEMEZ bicimde (arka plandaki metin katmani dahil) silinir.
+
+B) UYAP DOKUMAN DONUSTURUCU (Word & Excel -> PDF):
+   - Word (.docx, .doc), Excel (.xlsx, .xls) ve gorselleri tek tikla UYAP uyumlu
+     PDF'e donusturur.
+   - Coklu dosya birlestirme (merge) yapabilir, dosyalari surukleyerek siralayabilirsiniz.
+   - UYAP 10 MB dosya boyutu sinirini asmamak icin tahmini boyut gostergesi sunar.
+
+
+5. KLAVYE KISAYOLLARI
+----------------------
+- Ctrl + Z           : Son islemi geri al (Undo)
+- Ctrl + Y           : Geri alinan islemi yinele (Redo)
+- J / K              : Sansur kutulari arasinda hizli gecis
+- Bosluk (Space)     : Secili sansur kutusunu onayla / onayi kaldir
+- W                  : Bir sonraki sansur kutusuna atla
+- Ok Tuslari         : Secili sansur kutusunu 2pt hassasiyetle kaydir (Nudge)
+- Shift + Ok Tuslari : Secili sansur kutusunu 10pt hizli kaydir
+- Delete / Backspace : Secili kutuyu sil
+- Esc                : Aktif cizim veya secimi iptal et
+
+
+Sorulariniz ve teknik destek icin: info@paralegaltech.local
+================================================================================
