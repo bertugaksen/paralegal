@@ -18,13 +18,34 @@ if sys.stderr is None:
 
 def get_base_dir() -> Path:
     """PyInstaller dondurulmuş modu veya geliştirme ortamı temel dizinini döndürür."""
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
+    if getattr(sys, "frozen", False):
+        if hasattr(sys, "_MEIPASS"):
+            p = Path(sys._MEIPASS)
+            if (p / "frontend" / "dist").exists() or (p / "assets").exists():
+                return p
+            if (p / "_internal" / "frontend" / "dist").exists() or (p / "_internal" / "assets").exists():
+                return p / "_internal"
+        exe_dir = Path(sys.executable).resolve().parent
+        if (exe_dir / "frontend" / "dist").exists() or (exe_dir / "assets").exists():
+            return exe_dir
+        if (exe_dir / "_internal" / "frontend" / "dist").exists() or (exe_dir / "_internal" / "assets").exists():
+            return exe_dir / "_internal"
+        if hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent
 
 BASE_DIR = get_base_dir()
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
+
+# exe dizinini de sys.path'e ekle (gerektiğinde)
+if getattr(sys, "frozen", False):
+    exe_dir = Path(sys.executable).resolve().parent
+    if str(exe_dir) not in sys.path:
+        sys.path.insert(0, str(exe_dir))
+    internal_dir = exe_dir / "_internal"
+    if internal_dir.exists() and str(internal_dir) not in sys.path:
+        sys.path.insert(0, str(internal_dir))
 
 CURRENT_DIR = BASE_DIR
 
@@ -45,6 +66,20 @@ def find_free_port(preferred_port: int = 52410) -> int:
         return s.getsockname()[1]
 
 
+def get_asset_path(filename: str) -> Path:
+    """İkon ve varlık dosyalarını her çalışma modunda (onefile, onedir, dev) güvenle bulur."""
+    candidates = [
+        BASE_DIR / "assets" / filename,
+        Path(sys.executable).resolve().parent / "assets" / filename,
+        Path(sys.executable).resolve().parent / "_internal" / "assets" / filename,
+        Path(__file__).resolve().parent / "assets" / filename,
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return BASE_DIR / "assets" / filename
+
+
 def run_desktop_app():
     # PySide6 modüllerini yükle
     from PySide6.QtWidgets import QApplication, QMainWindow
@@ -63,8 +98,8 @@ def run_desktop_app():
     app.setApplicationName("Paralegal")
     app.setOrganizationName("ParalegalTech")
 
-    ico_path = CURRENT_DIR / "assets" / "paralegal_icon.ico"
-    png_path = CURRENT_DIR / "assets" / "paralegal_icon.png"
+    ico_path = get_asset_path("paralegal_icon.ico")
+    png_path = get_asset_path("paralegal_icon.png")
     icon_path = ico_path if ico_path.exists() else png_path
     if icon_path.exists():
         app_icon = QIcon(str(icon_path))

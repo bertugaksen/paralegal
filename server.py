@@ -17,8 +17,20 @@ from core.routes import RouteHandler
 
 def get_base_dir() -> Path:
     """PyInstaller dondurulmuş modu veya geliştirme ortamı temel dizinini döndürür."""
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
+    if getattr(sys, "frozen", False):
+        if hasattr(sys, "_MEIPASS"):
+            p = Path(sys._MEIPASS)
+            if (p / "frontend" / "dist").exists():
+                return p
+            if (p / "_internal" / "frontend" / "dist").exists():
+                return p / "_internal"
+        exe_dir = Path(sys.executable).resolve().parent
+        if (exe_dir / "frontend" / "dist").exists():
+            return exe_dir
+        if (exe_dir / "_internal" / "frontend" / "dist").exists():
+            return exe_dir / "_internal"
+        if hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent
 
 BASE_DIR = get_base_dir()

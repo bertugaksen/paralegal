@@ -11,6 +11,8 @@ build/
 develop-eggs/
 /dist/
 !frontend/dist/
+dist_installer/
+*.exe
 downloads/
 eggs/
 .eggs/
