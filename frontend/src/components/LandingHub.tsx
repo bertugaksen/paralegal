@@ -174,15 +174,13 @@ export const LandingHub: React.FC<LandingHubProps> = ({
         className="flex items-center justify-between border-b border-[rgba(22,23,26,0.12)] pb-4 sm:pb-5 shrink-0"
       >
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#0E254A] text-[#FBFBFA] flex items-center justify-center font-bold text-lg sm:text-xl brutal-shadow-sm shrink-0">
-            ⚖️
-          </div>
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#0E254A] text-[#FBFBFA] flex items-center justify-center font-black font-serif text-xl sm:text-2xl border border-[#16171A] brutal-shadow-sm shrink-0 tracking-tight select-none">P<span className="text-[#D4AF37] text-base leading-none">.</span></div>
           <div className="flex flex-col">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#16171A] leading-none">
-              PARALEGAL
+              PARALEGAL.
             </h1>
             <p className="text-[11px] sm:text-xs text-[#5A5D66] font-medium mt-1">
-              Avukatlar için yerel ve adli güvenlikli çalışma istasyonu.
+              Avukatlar için.
             </p>
           </div>
         </div>
@@ -224,7 +222,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </h2>
 
           <p className="text-xs text-[#5A5D66] mt-1.5 max-w-md font-medium leading-relaxed">
-            PDF, Word, Excel, E-Posta veya görsel dosyalarınızı doğrudan bırakabilirsiniz. Sistem dosya türünü algılayıp uygun adli akışı hazırlar.
+            Dosyalarınızı doğrudan sürükleyip bırakabilirsiniz. Sistem, dosya türünü algılayıp uygun işlemleri hazırlar.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -290,7 +288,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
                   className="btn-primary-court w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2"
                 >
                   <Layers className="w-4 h-4" />
-                  <span>Tek Bir UYAP PDF'i Olarak Birleştir</span>
+                  <span>Tek Bir PDF Olarak Birleştir</span>
                 </button>
 
                 <button
@@ -363,7 +361,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
                   Belge & Tablo Dönüştür
                 </h3>
                 <p className="text-[11px] text-[#5A5D66] leading-relaxed">
-                  Word, Excel ve görselleri UYAP uyumlu PDF'e çevirin.
+                  Word, Excel ve görselleri UYAP'ın boyut sınırıyla uyumlu olarak PDF'e çevirin.
                 </p>
               </div>
               <div className="mt-3 flex items-center text-xs font-bold text-[#0E254A] gap-1 group-hover:translate-x-1 transition-transform">
@@ -402,20 +400,6 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Alt Bilgi / Güvenlik Göstergeleri */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2, delay: 0.2 }}
-        className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-[11px] sm:text-xs text-[#5A5D66] font-medium border-t border-[rgba(22,23,26,0.1)] pt-3 sm:pt-4 shrink-0"
-      >
-        <span>⚡ %100 Çevrimdışı Çalışır</span>
-        <span className="hidden sm:inline text-[rgba(22,23,26,0.2)]">•</span>
-        <span>🔒 Veriler Asla Cihazınızdan Ayrılmaz</span>
-        <span className="hidden sm:inline text-[rgba(22,23,26,0.2)]">•</span>
-        <span>⚖️ Türk Yargı ve UYAP Standartlarına Uygun</span>
-      </motion.div>
     </div>
   );
 };

@@ -405,9 +405,9 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={handleAddPdfs}
-                  className="brutal-btn px-3 py-1.5 bg-[#121316] text-white text-xs font-bold flex items-center gap-1.5 hover:bg-[#1E3A8A]"
+                  className="brutal-btn h-8 px-3 bg-[#121316] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#1E3A8A] whitespace-nowrap"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
                   <span>Daha Fazla PDF Ekle</span>
                 </button>
 
@@ -417,9 +417,9 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                     setSelectedPaths([]);
                     setPdfInfos({});
                   }}
-                  className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] text-red-600 border-red-600 text-xs font-bold hover:bg-red-600 hover:text-white"
+                  className="brutal-btn h-8 px-3 bg-[#F4EFEA] text-red-600 border-red-600 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-red-600 hover:text-white whitespace-nowrap"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5 shrink-0" />
                   <span>Tümünü Kaldır</span>
                 </button>
               </div>
@@ -602,7 +602,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                           className="brutal-btn p-1.5 bg-[#F4EFEA] text-red-600 hover:bg-red-600 hover:text-white text-xs"
                           title="Listeden Kaldır"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
                         </button>
                       </div>
                     </div>
