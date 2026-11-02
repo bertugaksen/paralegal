@@ -14,14 +14,17 @@ import { useRedactorState, DEFAULT_FILTERS, CATEGORY_NAMES, cloneRedactions } fr
 import { Toolbar } from './components/Toolbar';
 import { Sidebar } from './components/Sidebar';
 import { ThumbnailStrip } from './components/ThumbnailStrip';
+import { CommandPalette } from './components/CommandPalette';
+import { SealingModal } from './components/SealingModal';
 import { FilterSettings, PDFMeta, RedactionItem } from '../../types';
 import { useToast } from '../../context/ToastContext';
 
 interface RedactorWorkspaceProps {
   onBackToHub: () => void;
+  initialPdfPath?: string;
 }
 
-export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHub }) => {
+export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHub, initialPdfPath }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [dismissScannedWarning, setDismissScannedWarning] = useState<boolean>(false);
@@ -44,6 +47,9 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
 
   const wasDraggedRef = useRef<boolean>(false);
   const [showSpeedRunBadge, setShowSpeedRunBadge] = useState<boolean>(true);
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isSealingModalOpen, setIsSealingModalOpen] = useState<boolean>(false);
 
   const selectedRedactionIdRef = useRef<string | null>(selectedRedactionId);
   useEffect(() => {
@@ -382,6 +388,12 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
       toast.error(`PDF okunamadı: ${err.message}`);
     }
   };
+
+  useEffect(() => {
+    if (initialPdfPath) {
+      loadDocument(initialPdfPath);
+    }
+  }, [initialPdfPath]);
 
   // Otomatik Tarama
   const triggerScan = async (path: string, currentFilters: FilterSettings, currentWhitelist: string[]) => {
@@ -883,8 +895,27 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         return;
       }
 
-      // Çizim aracı aktifken veya PDF yokken hızlı inceleme kısayollarını çalıştırma
-      if (drawToolActive || !pdfMeta) {
+      if (!pdfMeta) return;
+
+      // [Ctrl+K] veya [Cmd+K]: Adli Komut Paletini Aç
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // [F]: Zen Odak Modunu Aç / Kapat
+      if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && !drawToolActive) {
+        const tag = (document.activeElement?.tagName || '').toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea') {
+          e.preventDefault();
+          setIsFocusMode((prev) => !prev);
+          return;
+        }
+      }
+
+      // Çizim aracı aktifken hızlı inceleme kısayollarını çalıştırma
+      if (drawToolActive) {
         return;
       }
 
@@ -1059,15 +1090,23 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     return () => window.removeEventListener('keydown', handleUndoRedoKeyDown);
   }, [undo, redo]);
 
-  // Kalıcı Redaksiyonu Kaydet
-  const handleSaveRedactedPDF = async () => {
+  // Adli Mühürleme Protokolünü Tetikle
+  const handleSaveRedactedPDF = () => {
+    if (!pdfMeta) return;
+    const approvedList = redactions.filter((r) => r.approved);
+    if (approvedList.length === 0) {
+      toast.warning('Lütfen mühürlemeden önce en az bir sansürlenecek alan onaylayın.');
+      return;
+    }
+    setIsSealingModalOpen(true);
+  };
+
+  // Onay Verildikten Sonra Fiziksel Kayıt ve Mühürleme
+  const executeActualRedactionSave = async (attachCertificate: boolean) => {
     if (!pdfMeta) return;
 
     const approvedList = redactions.filter((r) => r.approved);
-    if (approvedList.length === 0) {
-      toast.warning('Lütfen en az bir sansürlenecek alan seçin.');
-      return;
-    }
+    if (approvedList.length === 0) return;
 
     const defaultOut = `${pdfMeta.filename.replace(/\.pdf$/i, '')}_anonimlestirildi.pdf`;
     const savePath = await api.chooseSavePath(defaultOut);
@@ -1081,12 +1120,14 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         savePath,
         approvedList,
         redactionColor,
-        redactionOverlay
+        redactionOverlay,
+        attachCertificate
       );
-      setSaveStatus(`Başarıyla kaydedildi: ${result.output_path} (${result.redactions_applied || result.total_redactions} alan sansürlendi)`);
-      toast.success('Belge başarıyla kaydedildi!');
+      setSaveStatus(`Adli olarak mühürlendi: ${result.output_path} (${result.redactions_applied || result.total_redactions} alan imha edildi)`);
+      toast.success('Belge başarıyla adli olarak mühürlendi ve kaydedildi!');
+      setIsSealingModalOpen(false);
     } catch (err: any) {
-      toast.error(`Kaydetme hatası: ${err.message}`);
+      toast.error(`Mühürleme hatası: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -1131,6 +1172,8 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         onSave={handleSaveRedactedPDF}
         showThumbnails={showThumbnails}
         onToggleThumbnails={() => setShowThumbnails((prev) => !prev)}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
       />
 
       {/* Adli Güvenlik Uyarı Banner'ı (Taranmış / Görsel Evrak) */}
@@ -1216,7 +1259,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         <div className="flex-1 flex overflow-hidden">
           {/* Sol: ThumbnailStrip (Sayfa Gezgini Şeridi) */}
           <AnimatePresence initial={false}>
-            {showThumbnails && (
+            {!isFocusMode && showThumbnails && (
               <motion.div
                 initial={{ width: 0, opacity: 0 }}
                 animate={{ width: 130, opacity: 1 }}
@@ -1246,7 +1289,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                 setSelectedRedactionId(null);
               }
             }}
-            className={`flex-1 bg-[#22242A] overflow-auto p-6 relative select-none transition-all ${
+            className={`flex-1 bg-[#EFECE6] overflow-auto p-6 relative select-none transition-all ${
               drawToolActive ? 'cursor-crosshair' : 'cursor-default'
             } ${isDragging ? 'outline-4 outline-dashed outline-[#1E3A8A] -outline-offset-8' : ''}`}
           >
@@ -1267,7 +1310,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                       pageRefs.current[pageIdx] = el;
                     }}
                     data-page-index={pageIdx}
-                    className="relative brutal-card bg-white mx-auto shrink-0 select-none transition-all duration-75 mb-8 shadow-[0_4px_20px_rgba(0,0,0,0.35)] !shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+                    className="relative bg-white mx-auto shrink-0 select-none transition-all duration-75 mb-8 border border-[rgba(22,23,26,0.15)] shadow-paper-lg"
                     style={{
                       width: `${cardWidth}px`,
                       height: `${cardHeight}px`,
@@ -1387,7 +1430,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                                     : 'cursor-pointer'
                                 } ${
                                   isSelected
-                                    ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-white shadow-[0_0_18px_rgba(245,158,11,0.75)] z-30 animate-pulse'
+                                    ? 'ring-2 ring-[#0E254A] ring-offset-2 ring-offset-white shadow-md z-30'
                                     : isHovered
                                     ? 'ring-2 ring-[#1E3A8A] ring-offset-1 z-30'
                                     : ''
@@ -1680,13 +1723,37 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
             selectedRedactionId={selectedRedactionId}
             setSelectedRedactionId={setSelectedRedactionId}
             saveStatus={saveStatus}
-            isCollapsed={isSidebarCollapsed}
+            isCollapsed={isFocusMode || isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
             onApproveCategory={approveCategory}
             onUnapproveCategory={unapproveCategory}
           />
         </div>
       )}
+
+      {/* Adli Mühürleme Protokol Penceresi */}
+      <SealingModal
+        isOpen={isSealingModalOpen}
+        onClose={() => setIsSealingModalOpen(false)}
+        pdfMeta={pdfMeta}
+        redactions={redactions}
+        onConfirmSeal={executeActualRedactionSave}
+        isSaving={isSaving}
+      />
+
+      {/* Global Adli Komut Paleti (Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        pdfMeta={pdfMeta}
+        redactions={redactions}
+        onApproveAll={approveAllAcrossDocument}
+        onUnapproveAll={unapproveAllAcrossDocument}
+        onScrollToPage={scrollToPage}
+        onToggleDrawTool={() => setDrawToolActive((prev) => !prev)}
+        onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
+        onSave={handleSaveRedactedPDF}
+      />
     </div>
   );
 };

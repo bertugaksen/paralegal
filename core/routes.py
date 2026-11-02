@@ -8,6 +8,8 @@ import pymupdf as fitz
 from core.converter import ImageConverter
 from core.excel_converter import ExcelConverter
 from core.word_converter import WordConverter
+from core.msg_converter import MsgConverter
+from core.pdf_merger import PDFMerger
 from core.kvkk_detector import KVKKDetector
 from core.redactor import PDFRedactor
 from core.dialog_utils import (
@@ -97,7 +99,8 @@ class RouteHandler:
         self.server._send_json({"path": chosen})
 
     def choose_files(self, path: str, data: Dict[str, Any]):
-        chosen = ask_open_filenames()
+        file_type = data.get("file_type", "converter") if isinstance(data, dict) else "converter"
+        chosen = ask_open_filenames(file_type=file_type)
         self.server._send_json({"paths": chosen})
 
     def choose_save_path(self, path: str, data: Dict[str, Any]):
@@ -204,11 +207,12 @@ class RouteHandler:
         redactions = data.get("redactions", [])
         fill_color = (0.0, 0.0, 0.0) if data.get("color", "black") == "black" else (1.0, 1.0, 1.0)
         overlay_text = "[SANSÜRLENDİ]" if data.get("overlay", "none") == "redacted" else None
+        attach_certificate = data.get("attach_certificate", False)
 
         formatted = [{"page_number": i.get("page_number", 0), "rect": tuple(i.get("rect", [0,0,0,0])), "value": i.get("value", ""), "approved": i.get("approved", True)} for i in redactions]
 
         try:
-            res = PDFRedactor.apply_redactions_to_pdf(input_path, output_path, formatted, fill_color, overlay_text)
+            res = PDFRedactor.apply_redactions_to_pdf(input_path, output_path, formatted, fill_color, overlay_text, attach_certificate=attach_certificate)
             res["redactions_applied"] = res.get("total_redactions", 0)
             self.server._send_json(res)
         except Exception as e:
@@ -251,6 +255,49 @@ class RouteHandler:
         except Exception as e:
             self.server._send_json({"error": str(e)}, 500)
 
+    def convert_msg(self, path: str, data: Dict[str, Any]):
+        input_path = data.get("input_path")
+        if not input_path or not os.path.exists(input_path):
+            self.server._send_json({"error": "E-posta dosyası bulunamadı"}, 404)
+            return
+        try:
+            res = MsgConverter.convert_msg_to_pdf(
+                input_path=input_path, output_path=data.get("output_path")
+            )
+            self.server._send_json({"success": True, "output_path": res})
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
+    def merge_pdfs(self, path: str, data: Dict[str, Any]):
+        input_paths = data.get("input_paths", [])
+        if not input_paths:
+            self.server._send_json({"error": "Birleştirilecek PDF listesi boş"}, 400)
+            return
+
+        output_path = data.get("output_path")
+        add_bookmarks = data.get("add_bookmarks", True)
+
+        try:
+            res = PDFMerger.merge_pdfs(
+                input_paths=input_paths,
+                output_path=output_path,
+                add_bookmarks=add_bookmarks
+            )
+            self.server._send_json(res)
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
+    def pdf_info(self, path: str, data: Dict[str, Any]):
+        pdf_path = data.get("path")
+        if not pdf_path or not os.path.exists(pdf_path):
+            self.server._send_json({"error": "PDF bulunamadı"}, 404)
+            return
+        try:
+            res = PDFMerger.get_pdf_info(pdf_path)
+            self.server._send_json(res)
+        except Exception as e:
+            self.server._send_json({"error": str(e)}, 500)
+
     def convert_images(self, path: str, data: Dict[str, Any]):
         input_paths = data.get("input_paths", [])
         combine = data.get("combine", False)
@@ -264,6 +311,8 @@ class RouteHandler:
 
         results = []
         try:
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
             if combine:
                 first_p = Path(input_paths[0])
                 out_path = os.path.join(output_dir, f"{first_p.stem}_birlestirilmis.pdf") if output_dir else str(first_p.parent / f"{first_p.stem}_birlestirilmis.pdf")
@@ -281,6 +330,8 @@ class RouteHandler:
                                 ExcelConverter.convert_excel_to_pdf(p_str, tmp_pdf, orientation=excel_opts.get("orientation", "auto"), fit_width=excel_opts.get("fit_width", True), repeat_header=excel_opts.get("repeat_header", True))
                             elif WordConverter.is_supported(p_str):
                                 WordConverter.convert_word_to_pdf(p_str, tmp_pdf)
+                            elif MsgConverter.is_supported(p_str):
+                                MsgConverter.convert_msg_to_pdf(p_str, tmp_pdf)
                             elif ImageConverter.is_supported(p_str):
                                 ImageConverter.convert_image_to_pdf(p_str, tmp_pdf, rotation=rotations.get(p_str, 0))
                             temp_pdfs.append(tmp_pdf)
@@ -309,6 +360,8 @@ class RouteHandler:
                         results.append(ExcelConverter.convert_excel_to_pdf(p_str, out_path, orientation=excel_opts.get("orientation", "auto"), fit_width=excel_opts.get("fit_width", True), repeat_header=excel_opts.get("repeat_header", True)))
                     elif WordConverter.is_supported(p_str):
                         results.append(WordConverter.convert_word_to_pdf(p_str, out_path))
+                    elif MsgConverter.is_supported(p_str):
+                        results.append(MsgConverter.convert_msg_to_pdf(p_str, out_path))
                     else:
                         results.append(ImageConverter.convert_image_to_pdf(p_str, out_path, rotation=rotations.get(p_str, 0)))
 
@@ -475,7 +528,11 @@ class RouteHandler:
             "/api/analyze-excel": self.analyze_excel,
             "/api/convert-excel": self.convert_excel,
             "/api/convert-word": self.convert_word,
+            "/api/convert-msg": self.convert_msg,
+            "/api/convert-email": self.convert_msg,
             "/api/convert-images": self.convert_images,
+            "/api/merge-pdfs": self.merge_pdfs,
+            "/api/pdf-info": self.pdf_info,
             "/api/upload-file": self.upload_file,
             "/api/upload_file": self.upload_file,
             "/api/clean-temp-uploads": self.clean_temp_uploads,

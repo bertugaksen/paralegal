@@ -35,6 +35,12 @@ hiddenimports = [
     "win32com.client",
     "pythoncom",
     "win32api",
+    "extract_msg",
+    "pypff",
+    "mailbox",
+    "email",
+    "email.policy",
+    "email.message",
 ]
 
 a = Analysis(

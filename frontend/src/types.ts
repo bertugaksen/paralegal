@@ -1,4 +1,4 @@
-export type WorkspaceMode = 'hub' | 'redactor' | 'converter';
+export type WorkspaceMode = 'hub' | 'redactor' | 'converter' | 'merger';
 
 export interface RedactionItem {
   id: string;
@@ -53,3 +53,13 @@ export interface FileSizeInfo {
   size_formatted: string;
 }
 
+export interface PDFInfo {
+  path: string;
+  filename: string;
+  page_count: number;
+  size_bytes: number;
+  size_formatted: string;
+  is_encrypted?: boolean;
+  has_toc?: boolean;
+  title?: string;
+}

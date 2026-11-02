@@ -19,7 +19,8 @@ import {
   ChevronDown,
   Shield,
   AlertCircle,
-  GripVertical
+  GripVertical,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../../api';
@@ -27,9 +28,15 @@ import { useToast } from '../../context/ToastContext';
 
 interface ConverterWorkspaceProps {
   onBackToHub: () => void;
+  onOpenInRedactor?: (filePath: string) => void;
+  initialFiles?: string[];
 }
 
-export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackToHub }) => {
+export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
+  onBackToHub,
+  onOpenInRedactor,
+  initialFiles,
+}) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
 
@@ -43,6 +50,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
 
   const SUPPORTED_CONVERTER_EXTENSIONS = [
     '.docx', '.doc', '.xlsx', '.xls',
+    '.msg', '.eml', '.pst', '.ost', '.mbox', '.oft',
     '.tiff', '.tif', '.jpeg', '.jpg', '.png', '.bmp', '.webp', '.pdf'
   ];
 
@@ -87,7 +95,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
     });
 
     if (validFiles.length === 0) {
-      toast.error('Lütfen geçerli formatta dosya bırakın (Word, Excel, TIFF, JPEG, PNG, WEBP, PDF).');
+      toast.error('Lütfen geçerli formatta dosya bırakın (Word, Excel, E-Posta: EML, MSG, PST, OST, MBOX, OFT, Görsel, PDF).');
       return;
     }
 
@@ -116,6 +124,13 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
   } = useConverterState();
 
   const hasExcelFiles = selectedPaths.some((p) => /\.(xlsx|xls)$/i.test(p));
+
+  // Dışarıdan başlangıç dosyaları gelmişse listeye ekle
+  useEffect(() => {
+    if (initialFiles && initialFiles.length > 0) {
+      setSelectedPaths(initialFiles);
+    }
+  }, [initialFiles, setSelectedPaths]);
 
   // Dosya Boyutlarını Arka Plandan Çek
   useEffect(() => {
@@ -363,7 +378,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                 {isDragging ? 'Dosyaları Buraya Bırakın' : 'Dönüştürülecek dosyayı seçin.'}
               </h3>
               <p className="text-sm text-[#575A65] max-w-lg mx-auto mb-6 font-medium">
-                Word (.docx, .doc), Excel (.xlsx, .xls) veya taranmış delil görsellerini (TIFF, JPEG, PNG, WEBP) seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
+                Word (.docx, .doc), Excel (.xlsx, .xls), E-Posta (.eml, .msg, .pst, .ost, .mbox, .oft) veya taranmış delil görsellerini (TIFF, JPEG, PNG, WEBP) seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
               </p>
 
               <button className="brutal-btn py-3.5 px-8 bg-[#121316] text-white font-bold text-sm inline-flex items-center gap-2 hover:bg-[#1E3A8A] transition-colors">
@@ -572,6 +587,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                   const ext = fileName.split('.').pop()?.toUpperCase() || '';
                   const isExcel = /\.(xlsx|xls)$/i.test(filePath);
                   const isWord = /\.(docx|doc)$/i.test(filePath);
+                  const isEmail = /\.(msg|eml|pst|ost|mbox|oft)$/i.test(filePath);
                   const rot = rotations[filePath] || 0;
                   const sizeInfo = fileSizes[filePath];
                   const isItemDragged = draggedIndex === index;
@@ -651,6 +667,8 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                             <FileText className="w-6 h-6 text-[#1E3A8A]" />
                           ) : isExcel ? (
                             <FileSpreadsheet className="w-6 h-6 text-[#1E3A8A]" />
+                          ) : isEmail ? (
+                            <Mail className="w-6 h-6 text-[#1E3A8A]" />
                           ) : (
                             <img
                               src={api.getImageThumbnailUrl(filePath, rot)}
@@ -665,7 +683,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <span className={`px-1.5 py-0.2 border text-[10px] font-black ${
-                              isWord || isExcel
+                              isWord || isExcel || isEmail
                                 ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]'
                                 : 'bg-[#F4EFEA] border-[#121316] text-[#121316]'
                             }`}>
@@ -710,7 +728,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({ onBackTo
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         {/* 90° Sağa Döndür (Yalnızca görseller için) */}
-                        {!isExcel && !isWord && (
+                        {!isExcel && !isWord && !isEmail && (
                           <button
                             type="button"
                             onClick={() => rotateFile(filePath)}

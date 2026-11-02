@@ -1,4 +1,4 @@
-import { FilterSettings, PDFMeta, RedactionItem, FileSizeInfo } from './types';
+import { FilterSettings, PDFMeta, RedactionItem, FileSizeInfo, PDFInfo } from './types';
 
 const API_BASE = window.location.port === '3000' ? 'http://127.0.0.1:52410' : '';
 
@@ -67,14 +67,18 @@ export const api = {
     return data.path;
   },
 
-  async chooseFiles(): Promise<string[]> {
+  async chooseFiles(fileType: string = 'converter'): Promise<string[]> {
     const res = await fetch(`${API_BASE}/api/choose-files`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ file_type: fileType }),
     });
     const data = await res.json();
     return data.paths || [];
+  },
+
+  async choosePdfs(): Promise<string[]> {
+    return this.chooseFiles('pdf');
   },
 
   async chooseSavePath(defaultName: string = 'anonimlestirildi.pdf'): Promise<string | null> {
@@ -170,7 +174,8 @@ export const api = {
     outputPath: string,
     redactions: RedactionItem[],
     color: 'black' | 'white' = 'black',
-    overlay: 'none' | 'redacted' = 'none'
+    overlay: 'none' | 'redacted' = 'none',
+    attachCertificate: boolean = false
   ): Promise<any> {
     const res = await fetch(`${API_BASE}/api/apply-redactions`, {
       method: 'POST',
@@ -181,6 +186,7 @@ export const api = {
         redactions,
         color,
         overlay,
+        attach_certificate: attachCertificate,
       }),
     });
     if (!res.ok) {
@@ -261,6 +267,85 @@ export const api = {
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Excel dönüştürme hatası');
+    }
+    return res.json();
+  },
+
+  async convertWord(
+    inputPath: string,
+    outputPath?: string
+  ): Promise<{ success: boolean; output_path: string }> {
+    const res = await fetch(`${API_BASE}/api/convert-word`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input_path: inputPath,
+        output_path: outputPath,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Word dönüştürme hatası');
+    }
+    return res.json();
+  },
+
+  async convertMsg(
+    inputPath: string,
+    outputPath?: string
+  ): Promise<{ success: boolean; output_path: string }> {
+    const res = await fetch(`${API_BASE}/api/convert-msg`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input_path: inputPath,
+        output_path: outputPath,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'E-posta dönüştürme hatası');
+    }
+    return res.json();
+  },
+
+  async convertEmail(
+    inputPath: string,
+    outputPath?: string
+  ): Promise<{ success: boolean; output_path: string }> {
+    return this.convertMsg(inputPath, outputPath);
+  },
+
+  async mergePdfs(
+    inputPaths: string[],
+    outputPath?: string,
+    addBookmarks: boolean = true
+  ): Promise<{ success: boolean; output_path: string; total_pages: number; file_count: number; size_bytes: number; size_formatted: string }> {
+    const res = await fetch(`${API_BASE}/api/merge-pdfs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input_paths: inputPaths,
+        output_path: outputPath,
+        add_bookmarks: addBookmarks,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'PDF birleştirme hatası');
+    }
+    return res.json();
+  },
+
+  async getPdfInfo(path: string): Promise<PDFInfo> {
+    const res = await fetch(`${API_BASE}/api/pdf-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'PDF bilgisi alınamadı');
     }
     return res.json();
   },

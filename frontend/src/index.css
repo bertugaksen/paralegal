@@ -49,31 +49,44 @@
 }
 
 :root {
-  /* 3 Renk Disiplini (60 - 30 - 10) Tasarım Belirteçleri */
-  --bg-primary: #F4EFEA;       /* %60 Sıcak Hukuk Beji */
-  --bg-surface: #FFFFFF;       /* Kart ve Doküman İçi */
-  --bg-subtle: #EAE3DC;        /* Ayrıcı Çizgiler & Pasif Zemin */
+  /* Hukuki Arşiv & Calm Tech Tasarım Belirteçleri (The Golden Synthesis) */
+  --bg-app: #FBFBFA;           /* Taze Arşiv / Parşömen Kâğıdı */
+  --bg-canvas: #EFECE6;        /* Göz Dinlendiren Taş Kanvas */
+  --bg-surface: #FFFFFF;       /* Saf Belge ve Kart Yüzeyi */
+  --bg-subtle: #F3EFEA;        /* Ayrıcı Çizgiler ve Pasif Zemin */
 
-  --text-main: #121316;        /* %30 Mürekkep Siyahı */
-  --text-muted: #575A65;       /* Açıklama ve Alt Metinler */
-  --border-dark: #121316;      /* Sert Çerçeveler */
-  --shadow-dark: #121316;      /* Sert Düşen Gölgeler */
+  --ink-primary: #16171A;      /* Asırlık Demir Mazı Kök Mürekkebi */
+  --ink-secondary: #5A5D66;    /* Arşiv Kurşun Kalemi Tonu */
+  --ink-rule: rgba(22, 23, 26, 0.12); /* 1px Hairline Ayırıcı */
 
-  --primary-accent: #1E3A8A;   /* %10 Hukuk Laciverti */
-  --primary-hover: #172554;    /* Lacivert Hover */
-  --primary-text: #FFFFFF;     /* Buton İçi Beyaz Yazı */
+  --court-navy: #0E254A;       /* Yargıtay & Baro Laciverti */
+  --court-navy-hover: #08162E; /* Derin Lacivert */
+  --seal-crimson: #8B1E1E;     /* Resmi Adli Balmumu Mührü Kırmızısı */
+  --seal-crimson-hover: #6B1717;
+
+  /* Geriye Dönük Uyumluluk */
+  --bg-primary: #FBFBFA;
+  --text-main: #16171A;
+  --text-muted: #5A5D66;
+  --border-dark: #16171A;
+  --shadow-dark: #16171A;
+  --primary-accent: #0E254A;
+  --primary-hover: #08162E;
+  --primary-text: #FFFFFF;
 }
 
 @theme {
   --font-sans: 'Muller', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Muller', monospace, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Muller', monospace, sans-serif;
 
-  --color-sand: #F4EFEA;
-  --color-charcoal: #121316;
-  --color-cobalt: #1E3A8A;
-  --color-cobalt-hover: #172554;
-  --color-muted: #575A65;
-  --color-subtle: #EAE3DC;
+  --color-sand: #FBFBFA;
+  --color-canvas: #EFECE6;
+  --color-charcoal: #16171A;
+  --color-cobalt: #0E254A;
+  --color-cobalt-hover: #08162E;
+  --color-seal: #8B1E1E;
+  --color-muted: #5A5D66;
+  --color-subtle: #F3EFEA;
 }
 
 *,
@@ -87,8 +100,8 @@ body {
   width: 100%;
   height: 100%;
   font-family: 'Muller', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: #F4EFEA;
-  color: #121316;
+  background-color: #FBFBFA;
+  color: #16171A;
   line-height: 1.5;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
@@ -100,123 +113,185 @@ body {
   touch-action: pan-x pan-y;
 }
 
-/* Neo-Brutalist Yapı Sınıfları */
+/* ==========================================================================
+   DOKUNSAL VE DİNGİN YAPI SINIFLARI (TACTILE & CALM STRUCTURE)
+   ========================================================================== */
+
+/* 1px ve 1.5px Hairline Sınır Sistemi */
+.court-border-hairline {
+  border: 1px solid rgba(22, 23, 26, 0.12);
+}
+
 .brutal-border {
-  border: 2px solid #121316;
+  border: 1.5px solid #16171A;
 }
 
 .brutal-border-sm {
-  border: 1.5px solid #121316;
+  border: 1px solid #16171A;
 }
 
 .brutal-border-lg {
-  border: 3px solid #121316;
+  border: 2px solid #16171A;
 }
 
+/* Dengeli Dokunsal Gölgeler (Aşırı sıçrama yok, katı zemin hissi var) */
 .brutal-shadow {
-  box-shadow: 3px 3px 0px 0px #121316;
+  box-shadow: 2px 2px 0px 0px #16171A;
 }
 
 .brutal-shadow-sm {
-  box-shadow: 2px 2px 0px 0px #121316;
+  box-shadow: 1.5px 1.5px 0px 0px #16171A;
 }
 
 .brutal-shadow-lg {
-  box-shadow: 5px 5px 0px 0px #121316;
+  box-shadow: 3.5px 3.5px 0px 0px #16171A;
 }
 
 .brutal-shadow-xl {
-  box-shadow: 7px 7px 0px 0px #121316;
+  box-shadow: 5px 5px 0px 0px #16171A;
 }
 
-/* Dokunsal Neo-Brutalist Butonlar */
-.brutal-btn {
-  border: 2px solid #121316;
-  box-shadow: 3px 3px 0px 0px #121316;
+/* Asil Kağıt Süzülme Gölgeleri */
+.shadow-paper {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 14px rgba(22, 23, 26, 0.04);
+}
+
+.shadow-paper-lg {
+  box-shadow: 0 4px 20px -2px rgba(22, 23, 26, 0.08), 0 1px 4px rgba(22, 23, 26, 0.03);
+}
+
+/* Dokunsal Eylem Butonları (.btn-chancery & .brutal-btn) */
+.brutal-btn,
+.btn-chancery {
+  border: 1.5px solid #16171A;
+  box-shadow: 2px 2px 0px 0px #16171A;
   transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
   user-select: none;
 }
 
-.brutal-btn:hover:not(:disabled) {
-  transform: translate(-1.5px, -1.5px);
-  box-shadow: 4.5px 4.5px 0px 0px #121316;
+.brutal-btn:hover:not(:disabled),
+.btn-chancery:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px 0px #16171A;
 }
 
-.brutal-btn:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px 0px #121316;
+.brutal-btn:active:not(:disabled),
+.btn-chancery:active:not(:disabled) {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0.5px 0.5px 0px 0px #16171A;
 }
 
-.brutal-btn:disabled {
+.brutal-btn:disabled,
+.btn-chancery:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  box-shadow: 1px 1px 0px 0px #121316;
+  box-shadow: 0.5px 0.5px 0px 0px #16171A;
 }
 
-/* Birincil Eylem Butonu (Primary CTA - Hukuk Laciverti) */
-.brutal-btn-primary {
-  background-color: #1E3A8A !important;
+/* Birincil Eylem Butonu (Primary CTA - Yargıtay & Baro Laciverti) */
+.brutal-btn-primary,
+.btn-primary-court {
+  background-color: #0E254A !important;
   color: #FFFFFF !important;
-  border: 2px solid #121316 !important;
-  box-shadow: 3px 3px 0px 0px #121316 !important;
+  border: 1.5px solid #16171A !important;
+  box-shadow: 2px 2px 0px 0px #16171A !important;
 }
 
-.brutal-btn-primary:hover:not(:disabled) {
-  background-color: #172554 !important;
-  transform: translate(-1.5px, -1.5px);
-  box-shadow: 4.5px 4.5px 0px 0px #121316 !important;
+.brutal-btn-primary:hover:not(:disabled),
+.btn-primary-court:hover:not(:disabled) {
+  background-color: #08162E !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px 0px #16171A !important;
 }
 
-.brutal-btn-primary:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px 0px #121316 !important;
+.brutal-btn-primary:active:not(:disabled),
+.btn-primary-court:active:not(:disabled) {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0.5px 0.5px 0px 0px #16171A !important;
 }
 
 /* Seçili / Aktif Buton Durumu */
 .brutal-btn-active {
-  background-color: #1E3A8A !important;
+  background-color: #0E254A !important;
   color: #FFFFFF !important;
-  border-color: #121316 !important;
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px 0px #121316 !important;
+  border-color: #16171A !important;
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0.5px 0.5px 0px 0px #16171A !important;
 }
 
+/* Resmi Mühürleme Butonu (Crimson Seal Button) */
+.btn-seal {
+  background-color: #8B1E1E !important;
+  color: #FFFFFF !important;
+  border: 1.5px solid #16171A !important;
+  box-shadow: 2.5px 2.5px 0px 0px #16171A !important;
+}
+
+.btn-seal:hover:not(:disabled) {
+  background-color: #6B1717 !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3.5px 3.5px 0px 0px #16171A !important;
+}
+
+.btn-seal:active:not(:disabled) {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0.5px 0.5px 0px 0px #16171A !important;
+}
+
+/* Kart Yapıları */
 .brutal-card {
-  border: 2px solid #121316;
-  box-shadow: 4px 4px 0px 0px #121316;
+  border: 1.5px solid #16171A;
+  box-shadow: 3px 3px 0px 0px #16171A;
   background-color: #FFFFFF;
 }
 
 .brutal-card-interactive {
-  border: 2px solid #121316;
-  box-shadow: 4px 4px 0px 0px #121316;
+  border: 1.5px solid #16171A;
+  box-shadow: 3px 3px 0px 0px #16171A;
   background-color: #FFFFFF;
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
 
 .brutal-card-interactive:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0px 0px #121316;
+  transform: translate(-1.5px, -1.5px);
+  box-shadow: 5px 5px 0px 0px #16171A;
+}
+
+/* Daktilo Tuş Şapkası Rozetleri (Hardware Keycaps) */
+.kbd-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', 'Muller', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  background-color: #F3EFEA;
+  color: #16171A;
+  border: 1px solid #16171A;
+  box-shadow: 1px 1px 0px 0px #16171A;
+  border-radius: 2px;
+  user-select: none;
 }
 
 /* Sakin ve Minimalist Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #EAE3DC;
-  border-left: 1.5px solid #121316;
+  background: #F3EFEA;
+  border-left: 1px solid rgba(22, 23, 26, 0.12);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #121316;
+  background: #16171A;
   border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #575A65;
+  background: #5A5D66;
 }

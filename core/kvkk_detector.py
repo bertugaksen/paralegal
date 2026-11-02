@@ -591,13 +591,17 @@ class KVKKDetector:
         # 3. Parantez içi bilgileri ayıkla (TCKN: ...), (VKN: ...) vb.
         s = re.sub(r"\s*\([^)]*\)", "", s).strip()
 
-        # 4. Tire veya çizgiyle ayrılan TCKN/VKN/Sicil eklerini kes
-        parts = re.split(r"\s+[-–—|]\s+", s)
-        if len(parts) > 1:
-            s = parts[0].strip()
+        # 4. Tire veya çizgiyle ayrılan TCKN/VKN/Sicil eklerini veya doğrudan -TCKN kalıplarını kes
+        tckn_split = re.search(r"\s*[-–—|]\s*(?=\d{10,11}\b)|\s*[-–—|]\s*", s)
+        if tckn_split and tckn_split.start() >= 3:
+            s = s[:tckn_split.start()].strip()
+
+        # 4b. Satır içi adres başlangıcı kalıntılarını (Mah., Cad., Sk. vb.) kes
+        addr_cut = re.search(r"\b(?:Mahallesi|Mah\b\.?|Mh\b\.?|Caddesi|Cad\b\.?|Cd\b\.?|Sokağı|Sok\b\.?|Sk\b\.?|Bulvarı|Bulv\b\.?|Blv\b\.?)\b", s, re.IGNORECASE)
+        if addr_cut and addr_cut.start() >= 3:
+            s = s[:addr_cut.start()].strip()
 
         # 5. Satır sonundaki sicil veya numara kalıntılarını ayıkla (örn: 'Mehmet Akif ÖZTÜRK 123456')
-        sicil_match = re.search(r"\s+(\d{4,11})$", s)
         s = re.sub(r"\s+\d{4,11}$", "", s).strip()
 
         # 6. Başta ve sonda kalan noktalama işaretlerini kaldır
@@ -623,19 +627,26 @@ class KVKKDetector:
         results: List[Dict[str, Any]],
         found_names: Set[str],
         found_companies: Set[str],
-        confidence: float = 0.95
+        confidence: float = 0.95,
+        role: str = ""
     ):
         # Satır sonundaki olası sicil numarasını yakala (örn: 'HÂKİM : İsim Soyisim 123456')
-        sicil_match = re.search(r"(?:sicil(?:\s*no)?[:\s\-]*|\s+)(\d{4,8})(?:\)|$)", candidate_text, re.IGNORECASE)
-        if sicil_match:
-            sicil_val = sicil_match.group(1).strip()
-            if len(sicil_val) >= 4 and sicil_val.isdigit():
-                results.append({
-                    "category": "SICIL_NO",
-                    "value": sicil_val,
-                    "confidence": 1.0,
-                    "approved": True
-                })
+        # Sadece adli personel (Hakim, Katip vb.) veya açıkça 'sicil' ibaresi varsa sicil no sayılır!
+        norm_role = tr_upper(role) if role else ""
+        is_court_staff = bool(norm_role and any(r in norm_role for r in ("HAKİM", "HÂKİM", "HAKIM", "KATİP", "KÂTİP", "KATIP", "SAVCI", "BİLİRKİŞİ", "MÜBAŞİR")))
+        has_sicil_kw = bool(re.search(r"sicil", candidate_text, re.IGNORECASE))
+
+        if is_court_staff or has_sicil_kw:
+            sicil_match = re.search(r"(?:sicil(?:\s*no)?[:\s\-]*|\s+)(\d{4,8})(?:\)|$)", candidate_text, re.IGNORECASE)
+            if sicil_match:
+                sicil_val = sicil_match.group(1).strip()
+                if len(sicil_val) >= 4 and sicil_val.isdigit():
+                    results.append({
+                        "category": "SICIL_NO",
+                        "value": sicil_val,
+                        "confidence": 1.0,
+                        "approved": True
+                    })
 
         cleaned, is_comp = cls.clean_party_entry(candidate_text)
         if not cleaned or len(cleaned) < 3:
@@ -815,28 +826,29 @@ class KVKKDetector:
 
         # 12. UYAP Taraf Başlıklarındaki İsimler ve Numaralandırılmış Taraf Listeleri
         for match in cls.PARTY_HEADER_PATTERN.finditer(text):
+            role = (match.group(1) or "").strip()
             raw_entry = (match.group(2) if match.lastindex and match.lastindex >= 2 else match.group(1)).strip()
             first_line = re.split(r"[\n\r]", raw_entry)[0].strip()
-            cls._add_party_candidate(first_line, results, found_names, found_companies, confidence=0.95)
+            cls._add_party_candidate(first_line, results, found_names, found_companies, confidence=0.95, role=role)
 
-            # Sadece bu başlığın hemen ardından gelen numaralı alt tarafları tara (örn: '2- MEHMET DEMİR')
-            # Asla belgenin geri kalanındaki hüküm fıkralarına veya metne yayılmaz!
-            end_pos = match.end()
-            trailing = text[end_pos:]
-            for line in trailing.splitlines()[:15]:
-                trimmed = line.strip()
-                if not trimmed:
-                    continue
-                # Yeni bir hukuki başlık veya bölüm başladıysa numaralı taraf listesi bitmiştir
-                if re.match(rf"^(?:{cls.PARTY_ROLES_STRING}|KONU|TALEP|DAVA|AÇIKLAMA|HÜKÜM|DELİL|NETİCE)\s*[:/]", trimmed, re.IGNORECASE):
-                    break
-                # Numaralı veya harfli liste maddesi kontrolü (örn: '1- ...', '2. ...', 'b) ...')
-                num_match = re.match(r"^(?:\d+|[a-zA-Z])[\s.-]+([^\n\r]+)", trimmed)
-                if num_match:
-                    item_text = num_match.group(1).strip()
-                    cls._add_party_candidate(item_text, results, found_names, found_companies, confidence=0.92)
-                else:
-                    break
+            # Sadece taraf başlıklarının ardından gelen numaralı alt tarafları tara (örn: '2- MEHMET DEMİR')
+            # Hâkim, kâtip veya savcı gibi yargı mensupları alt liste içermez
+            is_party_role = bool(re.search(r"(?i)^(?:DAVACI|DAVALI|SANIK|ŞÜPHELİ|MAĞDUR|MÜŞTEKİ|KATILAN|BORÇLU|ALACAKLI|İHBAR|MÜDAHİL|MİRASÇI)", role))
+            if is_party_role:
+                end_pos = match.end()
+                trailing = text[end_pos:]
+                for line in trailing.splitlines()[:25]:
+                    trimmed = line.strip()
+                    if not trimmed:
+                        continue
+                    # Yeni bir hukuki başlık veya bölüm başladıysa numaralı taraf listesi bitmiştir
+                    if re.match(rf"^(?:{cls.PARTY_ROLES_STRING}|KONU|TALEP|DAVA|AÇIKLAMA|HÜKÜM|DELİL|NETİCE|ESAS|KARAR|GEREĞİ\s+DÜŞÜNÜLDÜ|T\.C\.|TÜRK\s+MİLLETİ)\b\s*[:/]?", trimmed, re.IGNORECASE):
+                        break
+                    # Numaralı veya harfli liste maddesi kontrolü (örn: '1- ...', '2. ...', 'b) ...')
+                    num_match = re.match(r"^(?:\d+|[a-zA-Z])[\s.-]+([^\n\r]+)", trimmed)
+                    if num_match:
+                        item_text = num_match.group(1).strip()
+                        cls._add_party_candidate(item_text, results, found_names, found_companies, confidence=0.92, role=role)
 
         # 13. Metin İçi Kişi İsimleri ('müvekkil X Yılmaz', 'Av. X Yılmaz' vb.)
         for match in cls.RUNNING_TEXT_NAME_PATTERN.finditer(text):
@@ -1065,7 +1077,18 @@ class KVKKDetector:
                 if not rects and "'" in val:
                     root = val.split("'")[0]
                     rects = fitz_page.search_for(root)
-                # Adres gibi uzun metinlerde her satır veya ana parçayı ara
+                # Adres gibi çok satırlı veya uzun metinlerde her satırı ayrı ayrı ara
+                if not rects and "\n" in val:
+                    for lp in val.splitlines():
+                        lp_s = " ".join(lp.split())
+                        if len(lp_s) >= 4:
+                            rects.extend(fitz_page.search_for(lp_s))
+                if not rects and ent["category"] == "ADRES":
+                    for part in re.split(r"[\n\r]|(?<=\b(?:Mah\.|Mahallesi|Mh\.))\s+|(?<=\b(?:Sk\.|Sok\.|Sokağı|Cad\.|Caddesi|Bulv\.|Bulvarı))\s+", val):
+                        p_clean = " ".join(part.split())
+                        if len(p_clean) >= 4:
+                            rects.extend(fitz_page.search_for(p_clean))
+                # Adres gibi uzun metinlerde ilk parçayı ara
                 if not rects and len(val.split()) > 4:
                     chunk = " ".join(val.split()[:4])
                     rects = fitz_page.search_for(chunk)

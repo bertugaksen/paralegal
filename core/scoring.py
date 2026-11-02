@@ -263,15 +263,20 @@ class AddressScoringEngine:
     """
     Adreslerin Bileşen Puanlamalı Ayrıştırıcısı (Component-Based Address Engine).
     Monolitik tek regex yerine, hiyerarşik bileşenleri (İl, İlçe, Mahalle, Cadde, Ada/Parsel) puanlar.
+    Tek satırlı ve UYAP'ta satır sonu sarkan çok satırlı adresleri eksiksiz birleştirir.
     """
 
     NEIGHBORHOOD_REGEX = re.compile(
-        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{2,30})\s+(Mahallesi|Mah\.|Köyü|Mevkii|Mevkiinde)\b",
+        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+){0,2})\s+(?:Mahallesi|Mah\b\.?|Mh\b\.?|Köyü|Mevkii|Mevkiinde)(?=\s|[.,;/-]|$)",
         re.IGNORECASE
     )
 
     STREET_REGEX = re.compile(
-        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü0-9\s.,/-]{2,30})\s+(Caddesi|Cad\.|Sokağı|Sok\.|Bulvarı|Bulv\.|Yolu)\b",
+        r"(?:"
+        r"\b(?:\d{1,6}\.?|[A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+){0,2})\s+(?:Caddesi|Cad\b\.?|Cd\b\.?|Sokağı|Sokak|Sok\b\.?|Sk\b\.?|Bulvarı|Bulvar|Bulv\b\.?|Blv\b\.?|Yolu|Küme\s*Evleri|Sitesi|Apt\b\.?|Apartmanı)(?=\s|[.,;/-]|$)"
+        r"|"
+        r"\b(?:Sk\b\.?|Sok\b\.?|Cad\b\.?|Cd\b\.?|Bulv\b\.?|Blv\b\.?)\s*(?:No\b|[:.-]|\d)"
+        r")",
         re.IGNORECASE
     )
 
@@ -281,7 +286,19 @@ class AddressScoringEngine:
     )
 
     NUMBERING_REGEX = re.compile(
-        r"\b(?:No\s*[:.-]?\s*\d+[a-zA-Z]?(?:/\d+)?|Kat\s*[:.-]?\s*\d+|Daire\s*[:.-]?\s*\d+|D\s*[:.-]?\s*\d+)\b",
+        r"\b(?:"
+        r"(?:(?:İç|Dış|İç\s+Kapı|Dış\s+Kapı|Kapı)\s*)?No\s*[:.-]?\s*\d+[a-zA-Z]?(?:/\d+)?"
+        r"|Kat\s*[:.-]?\s*\d+"
+        r"|Daire\s*[:.-]?\s*\d+"
+        r"|D\s*[:.-]?\s*\d+"
+        r"|Blok\s*[:.-]?\s*[A-Z0-9]+"
+        r"|Giriş\s*[:.-]?\s*\d+"
+        r")\b",
+        re.IGNORECASE
+    )
+
+    DISTRICT_PROVINCE_REGEX = re.compile(
+        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü]+)\s*/\s*([A-ZÇĞİÖŞÜa-zçğıöşü]+)\b",
         re.IGNORECASE
     )
 
@@ -289,6 +306,62 @@ class AddressScoringEngine:
         r"\b([A-ZÇĞİÖŞÜa-zçğıöşü]+)\s+ili[,\s]+([A-ZÇĞİÖŞÜa-zçğıöşü]+)\s+ilçesi[,\s]+([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)\s+(?:mahallesi|mah\.|köyü|mevkii)\b",
         re.IGNORECASE
     )
+
+    SECTION_BREAK_RE = re.compile(
+        r"^(?:DAVACI|DAVALI|SANIK|ŞÜPHELİ|MAĞDUR|MÜŞTEKİ|KATILAN|MÜDAFİ|VEKİL|VEKİLİ|VEKİLLERİ|BORÇLU|ALACAKLI|KONU|TALEP|DAVA|AÇIKLAMA|HÜKÜM|DELİL|NETİCE|HAKİM|KATİP|SAVCI)\s*[:/]|^\s*(?:\d+|[a-zA-Z])[\s.-]+",
+        re.IGNORECASE
+    )
+
+    @classmethod
+    def extract_addr_start_index(cls, line: str) -> int:
+        """Satır içindeki adres başlangıcını tespit eder."""
+        exp_m = re.search(r"(?i)\b(?:ADRES(?:İ)?|İKAMETG[AÂ]H|YERLEŞİM\s+YERİ)\s*[:/]\s*", line)
+        if exp_m:
+            return exp_m.end()
+
+        id_m = re.search(r"\b\d{10,11}\b\s*", line)
+        if id_m:
+            after_id = line[id_m.end():]
+            if cls.NEIGHBORHOOD_REGEX.search(after_id) or cls.STREET_REGEX.search(after_id) or cls.NUMBERING_REGEX.search(after_id):
+                return id_m.end()
+
+        nh_m = cls.NEIGHBORHOOD_REGEX.search(line)
+        if nh_m:
+            return nh_m.start()
+
+        st_m = cls.STREET_REGEX.search(line)
+        if st_m:
+            return st_m.start()
+
+        return 0
+
+    @classmethod
+    def score_address_chunk(cls, text: str) -> float:
+        """Bir metin parçasının adres bileşen puanını hesaplar."""
+        score = 0.0
+        if cls.NEIGHBORHOOD_REGEX.search(text):
+            score += 2.5
+        if cls.STREET_REGEX.search(text):
+            score += 2.5
+        if cls.CADASTRAL_REGEX.search(text):
+            score += 2.5
+        if cls.NUMBERING_REGEX.search(text):
+            score += 2.0
+
+        norm = tr_upper(text)
+        words = set(re.findall(r"\b[A-ZÇĞİÖŞÜ]+\b", norm))
+        if words & TURKISH_PROVINCES:
+            score += 2.0
+        if words & TURKISH_DISTRICTS:
+            score += 2.0
+
+        dp_m = cls.DISTRICT_PROVINCE_REGEX.search(text)
+        if dp_m:
+            g1, g2 = tr_upper(dp_m.group(1)), tr_upper(dp_m.group(2))
+            if (g1 in TURKISH_DISTRICTS and g2 in TURKISH_PROVINCES) or (g1 in TURKISH_PROVINCES and g2 in TURKISH_DISTRICTS):
+                score += 2.5
+
+        return score
 
     @classmethod
     def find_address_entities(cls, text: str) -> List[Dict[str, Any]]:
@@ -322,52 +395,65 @@ class AddressScoringEngine:
                     "score": score
                 })
 
-        # 2. Standart Şehir Adresleri (Cadde + Mahalle + No)
+        # 2. Standart ve Çok Satırlı Şehir Adresleri (Cadde + Mahalle + No + İlçe/İl)
         lines = text.splitlines()
-        for line in lines:
-            trimmed = line.strip()
-            if len(trimmed) < 15:
+        consumed_lines = set()
+
+        for i in range(len(lines)):
+            if i in consumed_lines:
+                continue
+
+            raw_line = lines[i]
+            trimmed = raw_line.strip()
+            if len(trimmed) < 10:
                 continue
 
             # Eğer zaten idari adres tarafından yakalandıysa atla
             if any(r["value"] in trimmed or trimmed in r["value"] for r in results):
                 continue
 
-            score = 0.0
-            has_neighborhood = bool(cls.NEIGHBORHOOD_REGEX.search(trimmed))
-            has_street = bool(cls.STREET_REGEX.search(trimmed))
-            has_cadastral = bool(cls.CADASTRAL_REGEX.search(trimmed))
-            has_numbering = bool(cls.NUMBERING_REGEX.search(trimmed))
+            start_idx = cls.extract_addr_start_index(trimmed)
+            cand_text = trimmed[start_idx:].strip() if start_idx > 0 else trimmed
 
-            if has_neighborhood:
-                score += 2.5
-            if has_street:
-                score += 2.5
-            if has_cadastral:
-                score += 2.5
-            if has_numbering:
-                score += 2.0
+            # Çok satırlı adres birleşim denemesi (UYAP'ta alta sarkan sokak, no, ilçe/il)
+            combined = cand_text
+            curr_lines = [i]
+            j = i + 1
 
-            norm_line = tr_upper(trimmed)
-            words = set(re.findall(r"\b[A-ZÇĞİÖŞÜ]+\b", norm_line))
-            if words & TURKISH_PROVINCES:
-                score += 2.0
-            if words & TURKISH_DISTRICTS:
-                score += 2.0
+            while j < len(lines) and j <= i + 3:
+                nxt = lines[j].strip()
+                if not nxt:
+                    break
+                if cls.SECTION_BREAK_RE.match(nxt):
+                    break
 
-            if re.match(r"(?i)^(?:ADRES|İKAMETGÂH|YERLEŞİM YERİ)\s*[:/]", trimmed):
-                score += 3.0
+                nxt_score = cls.score_address_chunk(nxt)
+                comb_score = cls.score_address_chunk(combined + " " + nxt)
 
-            if score >= 5.0:
-                clean_val = re.sub(r"(?i)^(?:ADRES|İKAMETGÂH|YERLEŞİM YERİ)\s*[:/]\s*", "", trimmed).strip()
+                if comb_score > cls.score_address_chunk(combined) or nxt_score >= 2.0:
+                    combined = combined + " " + nxt
+                    curr_lines.append(j)
+                    j += 1
+                else:
+                    break
+
+            final_score = cls.score_address_chunk(combined)
+            if re.match(r"(?i)^(?:ADRES|İKAMETGÂH|YERLEŞİM YERİ)\s*[:/]", combined):
+                final_score += 3.0
+
+            if final_score >= 5.0:
+                clean_val = re.sub(r"(?i)^(?:ADRES|İKAMETGÂH|YERLEŞİM YERİ)\s*[:/]\s*", "", combined).strip()
+                clean_val = clean_val.strip(" ,;:-/")
                 if len(clean_val) >= 15:
                     results.append({
                         "category": "ADRES",
                         "value": clean_val,
-                        "confidence": 0.92,
-                        "approved": (score >= 6.0),
-                        "score": score
+                        "confidence": 0.95,
+                        "approved": (final_score >= 6.0),
+                        "score": final_score
                     })
+                    for l_idx in curr_lines:
+                        consumed_lines.add(l_idx)
 
         unique = []
         seen = set()

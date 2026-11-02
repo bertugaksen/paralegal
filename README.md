@@ -34,9 +34,11 @@ python run_paralegal.py
 - **Belge İçi 1 Tıkla Arama & Sansürleme:** Avukat arama kutusuna dilediği bir ismi veya şirketi yazarak tüm sayfalarda saniyeler içinde sansür uygulatabilir.
 - **Kalıcı Adli İmha (True Redaction):** `PyMuPDF` motoruyla sansür kutusu altındaki karakterleri, yazı tipi gliflerini ve görsel piksellerini PDF dosya kodundan **fiziksel ve kalıcı olarak siler**.
 
-### 2. 🖼️ Belge ve Tablo Dönüştürücü (Converter)
+### 2. 🖼️ Belge, Tablo ve E-Posta Dönüştürücü (Converter)
+- **E-Posta & İleti Formatları:** `.msg`, `.eml`, `.pst`, `.ost`, `.mbox`, `.oft` (Adli delil standartlarında üstbilgi zarfı, ekler ve sayfa sonu korumalı olarak UYAP PDF'e dönüştürür)
+- **Word Belgeleri:** `.docx`, `.doc`
+- **Excel Tabloları:** `.xlsx`, `.xls` (İşçilik alacak hesapları, kıdem-ihbar tabloları, banka ekstreleri, faiz tabloları, cari hesap dökümleri)
 - **Görsel Formatları:** `.tiff`, `.tif`, `.jpeg`, `.jpg`, `.png`, `.bmp`, `.webp`
-- **Excel Formatları:** `.xlsx`, `.xls` (İşçilik alacak hesapları, kıdem-ihbar tabloları, banka ekstreleri, faiz tabloları, cari hesap dökümleri)
 - **Akıllı Sütun Sığdırma (Fit to Width):** Geniş hukuki tablolarda sütunların ikinci sayfaya bölünmesini kesin olarak önler. Tüm sütunları tek bir sayfa genişliğinde tutar.
 - **Akıllı Sayfa Yönlendirmesi (Auto-Landscape):** Tablodaki sütun sayısını (≥6 sütun) analiz ederek sayfayı otomatik olarak Yatay (Landscape) A4 formatına ayarlar.
 - **Başlık Satırını Yineleme (Repeat Header Rows):** Sayfalarca süren tablolarda sütun başlıklarını her sayfada otomatik yeniler.

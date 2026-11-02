@@ -112,3 +112,49 @@ class TestKVKKDetectorIntegrationV3:
         entities = KVKKDetector.find_entities_in_text(text)
         names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
         assert len(names) == 0, f"Expected 0 names in heading, got: {names}"
+
+    def test_uyap_multiline_address_and_numbered_street_detected(self):
+        """Tests that Gürselpaşa Mah. 75149 and wrapped Sk. are detected as ADRES."""
+        text = (
+            "  2- ZELİHA ASLAN -48799791464  Gürselpaşa Mah. 75149 \n"
+            "Sk. No:1/3 İç Kapı No:09  Seyhan/ ADANA\n"
+        )
+        entities = KVKKDetector.find_entities_in_text(text)
+        addrs = [e["value"] for e in entities if e["category"] == "ADRES"]
+        assert len(addrs) >= 1
+        assert any("Gürselpaşa" in a and "Seyhan" in a and "ADANA" in a for a in addrs)
+
+        # Names should be cleanly ZELİHA ASLAN
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        assert "ZELİHA ASLAN" in names
+        assert not any("Gürselpaşa" in n for n in names)
+
+        # 75149 should not be a sicil number
+        sicils = [e["value"] for e in entities if e["category"] == "SICIL_NO"]
+        assert "75149" not in sicils
+
+    def test_uyap_davalilar_two_parties_multiline_addresses(self):
+        """Tests both defendants with multi-line addresses and numbers are completely identified."""
+        text = (
+            "DAVALILAR \n"
+            ": 1- METİN ASLAN -48805791204  Narlıkuyu Mah. 1114 \n"
+            "Sk. No:1 İç Kapı No:2  Karaköprü/ ŞANLIURFA\n"
+            "  2- ZELİHA ASLAN -48799791464  Gürselpaşa Mah. 75149 \n"
+            "Sk. No:1/3 İç Kapı No:09  Seyhan/ ADANA\n"
+            "VEKİLİ\n"
+            ": Av. İBRAHİM HALİL ASLAN -\n"
+        )
+        entities = KVKKDetector.find_entities_in_text(text)
+        addrs = [e["value"] for e in entities if e["category"] == "ADRES"]
+        assert len(addrs) >= 2
+        assert any("Narlıkuyu" in a and "ŞANLIURFA" in a for a in addrs)
+        assert any("Gürselpaşa" in a and "Seyhan" in a for a in addrs)
+
+        names = [e["value"] for e in entities if e["category"] == "TARAF_ISMI"]
+        assert "METİN ASLAN" in names
+        assert "ZELİHA ASLAN" in names
+
+        # Street numbers should not be mistaken for court judge/clerk sicils
+        sicils = [e["value"] for e in entities if e["category"] == "SICIL_NO"]
+        assert "1114" not in sicils
+        assert "75149" not in sicils

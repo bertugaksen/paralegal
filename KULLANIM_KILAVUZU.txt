@@ -54,9 +54,10 @@ A) KVKK / PDF SANSURLEME MODULU:
    - "Secili Sansurleri Uygula" dediginizde veriler PDF uzerinden KALICI VE GERI
      DONDURULEMEZ bicimde (arka plandaki metin katmani dahil) silinir.
 
-B) UYAP DOKUMAN DONUSTURUCU (Word & Excel -> PDF):
-   - Word (.docx, .doc), Excel (.xlsx, .xls) ve gorselleri tek tikla UYAP uyumlu
-     PDF'e donusturur.
+B) UYAP DOKUMAN VE E-POSTA DONUSTURUCU (Word, Excel & E-Posta -> PDF):
+   - Word (.docx, .doc), Excel (.xlsx, .xls), E-Posta ve Outlook iletileri
+     (.eml, .msg, .pst, .ost, .mbox, .oft) ve gorselleri tek tikla adli delil
+     standardinda UYAP uyumlu PDF'e donusturur.
    - Coklu dosya birlestirme (merge) yapabilir, dosyalari surukleyerek siralayabilirsiniz.
    - UYAP 10 MB dosya boyutu sinirini asmamak icin tahmini boyut gostergesi sunar.
 

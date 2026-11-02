@@ -101,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUnapproveCategory,
 }) => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'ALL' | string>('ALL');
+  const [viewMode, setViewMode] = useState<'cards' | 'grid'>('cards');
 
   const currentPageRedactions = redactions.filter((r) => r.page_number === currentPage);
   const scopeRedactions = dataScope === 'current_page' ? currentPageRedactions : redactions;
@@ -473,7 +474,90 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Dikey Veri Akışı */}
+          {/* Görünüm Modu Seçici (Sakin Kartlar vs. Forensic Audit Grid) */}
+          <div className="px-3 py-1 bg-[#FBFBFA] border-b border-[rgba(22,23,26,0.1)] flex items-center justify-between text-[10px] shrink-0">
+            <span className="font-bold text-[#5A5D66]">GÖRÜNÜM:</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-2 py-0.5 font-bold transition-all ${
+                  viewMode === 'cards'
+                    ? 'bg-[#16171A] text-white'
+                    : 'bg-white text-[#5A5D66] border border-[rgba(22,23,26,0.15)] hover:text-[#16171A]'
+                }`}
+              >
+                📑 Kartlar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`px-2 py-0.5 font-bold transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-[#0E254A] text-white'
+                    : 'bg-white text-[#5A5D66] border border-[rgba(22,23,26,0.15)] hover:text-[#16171A]'
+                }`}
+                title="Yüksek Yoğunluklu Adli Veri Matrisi (35-40 satır)"
+              >
+                📊 Matris (Audit Grid)
+              </button>
+            </div>
+          </div>
+
+          {/* Dikey Veri Akışı (Kartlar veya Yüksek Yoğunluklu Audit Grid) */}
+          {viewMode === 'grid' ? (
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              <div className="sticky top-0 bg-[#F3EFEA] border-b border-[rgba(22,23,26,0.12)] text-[10px] font-mono font-bold text-[#5A5D66] grid grid-cols-12 px-2.5 py-1.5 select-none z-10 shrink-0">
+                <span className="col-span-1">#</span>
+                <span className="col-span-2">SF</span>
+                <span className="col-span-3">TÜR</span>
+                <span className="col-span-4">DEĞER</span>
+                <span className="col-span-2 text-right">ONAY</span>
+              </div>
+              <div className="flex-1 divide-y divide-[rgba(22,23,26,0.06)]">
+                {displayedRedactions.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-[#5A5D66]">Veri bulunamadı.</div>
+                ) : (
+                  displayedRedactions.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      onMouseEnter={() => setHoveredRedactionId?.(item.id)}
+                      onMouseLeave={() => setHoveredRedactionId?.(null)}
+                      onClick={() => {
+                        setSelectedRedactionId?.(item.id);
+                        onToggleRedactionApproval(item.id);
+                        if (dataScope === 'all_pages') {
+                          onScrollToPage(item.page_number);
+                        }
+                      }}
+                      className={`grid grid-cols-12 px-2.5 py-1.5 items-center font-mono text-[11px] cursor-pointer hover:bg-[#F3EFEA] transition-colors select-none ${
+                        item.approved ? 'bg-white text-[#16171A]' : 'bg-[#FBFBFA]/60 text-[#5A5D66] opacity-60'
+                      } ${hoveredRedactionId === item.id || selectedRedactionId === item.id ? 'bg-[#0E254A]/10 font-bold ring-1 ring-[#0E254A]' : ''}`}
+                    >
+                      <span className="col-span-1 text-[10px] text-[#5A5D66]">{idx + 1}</span>
+                      <span className="col-span-2 text-[10px] font-bold text-[#0E254A]">S.{item.page_number + 1}</span>
+                      <span className="col-span-3 text-[10px] truncate text-[#16171A] font-bold">{item.category}</span>
+                      <span className="col-span-4 truncate text-[11px] text-[#16171A]" title={item.value}>{item.value || '(Alan)'}</span>
+                      <div className="col-span-2 flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleRedactionApproval(item.id);
+                          }}
+                          className={`w-4 h-4 rounded-xs border text-[10px] flex items-center justify-center font-bold ${
+                            item.approved ? 'bg-[#0E254A] border-[#0E254A] text-white shadow-xs' : 'border-[#16171A] bg-white'
+                          }`}
+                        >
+                          {item.approved ? '✓' : ''}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {displayedRedactions.length === 0 ? (
               <div className="text-center py-16 px-4 text-xs text-[#575A65] font-medium flex flex-col items-center">
@@ -573,8 +657,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div
                         className={`w-5 h-5 flex items-center justify-center border transition-all ${
                           item.approved
-                            ? 'bg-[#1E3A8A] border-[#1E3A8A] text-white shadow-xs'
-                            : 'border-neutral-300 bg-white hover:border-[#121316]'
+                            ? 'bg-[#0E254A] border-[#0E254A] text-white shadow-xs'
+                            : 'border-neutral-300 bg-white hover:border-[#16171A]'
                         }`}
                       >
                         {item.approved && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -585,6 +669,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               })
             )}
           </div>
+          )}
         </div>
       )}
 

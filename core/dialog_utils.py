@@ -30,9 +30,18 @@ def ask_open_filename(file_type: str = "pdf"):
                 filetypes = [("Excel Tabloları", "*.xlsx *.xls"), ("Tüm Dosyalar", "*.*")]
             elif file_type == "word":
                 filetypes = [("Word Belgeleri", "*.docx *.doc"), ("Tüm Dosyalar", "*.*")]
+            elif file_type in ("msg", "email"):
+                filetypes = [
+                    ("E-Posta ve Outlook Dosyaları (*.eml, *.msg, *.pst, *.ost, *.mbox, *.oft)", "*.eml *.msg *.pst *.ost *.mbox *.oft"),
+                    ("Outlook İletileri (*.msg, *.oft)", "*.msg *.oft"),
+                    ("E-Posta Dosyaları (*.eml, *.mbox)", "*.eml *.mbox"),
+                    ("Outlook Veri Dosyaları (*.pst, *.ost)", "*.pst *.ost"),
+                    ("Tüm Dosyalar", "*.*")
+                ]
             elif file_type in ("converter", "all_supported"):
                 filetypes = [
-                    ("Dönüştürülebilir Belgeler (Word, Excel & Görseller)", "*.docx *.doc *.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("Dönüştürülebilir Belgeler (Word, Excel, E-Posta & Görseller)", "*.docx *.doc *.xlsx *.xls *.msg *.eml *.pst *.ost *.mbox *.oft *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("E-Posta ve Outlook Dosyaları (*.eml, *.msg, *.pst, *.ost, *.mbox, *.oft)", "*.eml *.msg *.pst *.ost *.mbox *.oft"),
                     ("Word Belgeleri (*.docx, *.doc)", "*.docx *.doc"),
                     ("Excel Tabloları (*.xlsx, *.xls)", "*.xlsx *.xls"),
                     ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
@@ -51,7 +60,7 @@ def ask_open_filename(file_type: str = "pdf"):
                 pass
 
 
-def ask_open_filenames():
+def ask_open_filenames(file_type: str = "converter"):
     """
     Kullanıcıya çoklu dosya seçme penceresi sunar.
     """
@@ -64,14 +73,24 @@ def ask_open_filenames():
             root.focus_force()
             root.update()
 
-            filetypes = [
-                ("Desteklenen Belgeler (Word, Excel & Görseller)", "*.docx *.doc *.xlsx *.xls *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
-                ("Word Belgeleri (*.docx, *.doc)", "*.docx *.doc"),
-                ("Excel Tabloları (*.xlsx, *.xls)", "*.xlsx *.xls"),
-                ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
-                ("Tüm Dosyalar", "*.*")
-            ]
-            chosen = filedialog.askopenfilenames(title="Dönüştürülecek Belgeleri Seçin", filetypes=filetypes)
+            if file_type == "pdf":
+                filetypes = [
+                    ("PDF Belgeleri (*.pdf)", "*.pdf"),
+                    ("Tüm Dosyalar", "*.*")
+                ]
+                dialog_title = "Birleştirilecek PDF Belgelerini Seçin"
+            else:
+                filetypes = [
+                    ("Desteklenen Belgeler (Word, Excel, E-Posta & Görseller)", "*.docx *.doc *.xlsx *.xls *.msg *.eml *.pst *.ost *.mbox *.oft *.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("E-Posta ve Outlook Dosyaları (*.eml, *.msg, *.pst, *.ost, *.mbox, *.oft)", "*.eml *.msg *.pst *.ost *.mbox *.oft"),
+                    ("Word Belgeleri (*.docx, *.doc)", "*.docx *.doc"),
+                    ("Excel Tabloları (*.xlsx, *.xls)", "*.xlsx *.xls"),
+                    ("Görsel Dosyaları", "*.tiff *.tif *.jpeg *.jpg *.png *.bmp *.webp"),
+                    ("Tüm Dosyalar", "*.*")
+                ]
+                dialog_title = "Dönüştürülecek Belgeleri Seçin"
+
+            chosen = filedialog.askopenfilenames(title=dialog_title, filetypes=filetypes)
             return list(chosen) if chosen else []
         finally:
             try:
