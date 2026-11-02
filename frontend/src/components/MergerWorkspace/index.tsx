@@ -170,7 +170,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
       return;
     }
 
-    const files = Array.from(e.dataTransfer.files || []);
+    const files = Array.from(e.dataTransfer.files || []) as File[];
     const pdfFiles = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
 
     if (pdfFiles.length === 0) {

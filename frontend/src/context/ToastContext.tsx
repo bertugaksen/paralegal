@@ -11,15 +11,26 @@ export interface ToastItem {
   duration?: number;
 }
 
+export interface ToastOptions {
+  title?: string;
+  description?: string;
+  message?: string;
+  type?: ToastType;
+  duration?: number;
+}
+
+export type ToastFunction = {
+  (optionsOrMessage: ToastOptions | string, type?: ToastType, duration?: number): void;
+  success: (message: string, duration?: number) => void;
+  error: (message: string, duration?: number) => void;
+  warning: (message: string, duration?: number) => void;
+  info: (message: string, duration?: number) => void;
+};
+
 export interface ToastContextValue {
   showToast: (message: string, type?: ToastType, duration?: number) => void;
   removeToast: (id: string) => void;
-  toast: {
-    success: (message: string, duration?: number) => void;
-    error: (message: string, duration?: number) => void;
-    warning: (message: string, duration?: number) => void;
-    info: (message: string, duration?: number) => void;
-  };
+  toast: ToastFunction;
 }
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
@@ -153,15 +164,25 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     []
   );
 
-  const toast = useMemo(
-    () => ({
-      success: (msg: string, dur?: number) => showToast(msg, 'success', dur),
-      error: (msg: string, dur?: number) => showToast(msg, 'error', dur),
-      warning: (msg: string, dur?: number) => showToast(msg, 'warning', dur),
-      info: (msg: string, dur?: number) => showToast(msg, 'info', dur),
-    }),
-    [showToast]
-  );
+  const toast = useMemo<ToastFunction>(() => {
+    const fn = ((optionsOrMessage: ToastOptions | string, type: ToastType = 'info', dur?: number) => {
+      if (typeof optionsOrMessage === 'string') {
+        showToast(optionsOrMessage, type, dur);
+      } else if (optionsOrMessage && typeof optionsOrMessage === 'object') {
+        const title = optionsOrMessage.title ? `[${optionsOrMessage.title}] ` : '';
+        const desc = optionsOrMessage.description || optionsOrMessage.message || '';
+        const msg = `${title}${desc}`.trim();
+        showToast(msg, optionsOrMessage.type || type, optionsOrMessage.duration || dur);
+      }
+    }) as ToastFunction;
+
+    fn.success = (msg: string, dur?: number) => showToast(msg, 'success', dur);
+    fn.error = (msg: string, dur?: number) => showToast(msg, 'error', dur);
+    fn.warning = (msg: string, dur?: number) => showToast(msg, 'warning', dur);
+    fn.info = (msg: string, dur?: number) => showToast(msg, 'info', dur);
+
+    return fn;
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={{ showToast, removeToast, toast }}>

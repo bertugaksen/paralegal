@@ -88,7 +88,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
 
-    const rawFiles = Array.from(files);
+    const rawFiles = Array.from(files) as File[];
     const validFiles = rawFiles.filter((f) => {
       const lower = f.name.toLowerCase();
       return SUPPORTED_CONVERTER_EXTENSIONS.some((ext) => lower.endsWith(ext));

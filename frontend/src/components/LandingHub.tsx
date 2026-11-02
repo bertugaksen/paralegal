@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ShieldCheck,
   FileImage,
@@ -6,15 +6,27 @@ import {
   Shield,
   Layers,
   UploadCloud,
-  FileText,
-  FileSpreadsheet,
   Check,
-  X
+  X,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkspaceMode } from '../types';
 import { api } from '../api';
 import { useToast } from '../context/ToastContext';
+import {
+  inspectFiles,
+  mergePdfsClientSide,
+  convertImagesToPdfClientSide,
+  downloadBlob,
+  formatBytes,
+  isPdfFile,
+  isSupportedImageFile,
+  InspectionResult,
+  MAX_CLIENT_PAGES,
+  MAX_CLIENT_SIZE_BYTES
+} from '../services/clientPdfEngine';
+import { DesktopUpsellModal } from './DesktopUpsellModal';
 
 interface LandingHubProps {
   onSelectMode: (mode: WorkspaceMode) => void;
@@ -30,9 +42,15 @@ export const LandingHub: React.FC<LandingHubProps> = ({
   onOpenMergerWithFiles,
 }) => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
-  const [detectedFiles, setDetectedFiles] = useState<string[]>([]);
+  const [isExecutingClientOp, setIsExecutingClientOp] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [inspectionResult, setInspectionResult] = useState<InspectionResult | null>(null);
+  const [clientOpStatus, setClientOpStatus] = useState<string | null>(null);
+  const [showUpsellModal, setShowUpsellModal] = useState<boolean>(false);
 
   // Sürükle-bırak olayları
   const handleDragOver = (e: React.DragEvent) => {
@@ -48,49 +66,29 @@ export const LandingHub: React.FC<LandingHubProps> = ({
     setIsDragOver(false);
   };
 
-  const processFileList = async (files: File[]) => {
-    if (files.length === 0) return;
+  // Dosyaları analiz et ve limit kontrolü yap
+  const processFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return;
     setIsProcessingFiles(true);
+    setClientOpStatus(null);
+
     try {
-      const paths: string[] = [];
-      for (const f of files) {
-        try {
-          const p = await api.uploadFile(f);
-          if (p) paths.push(p);
-        } catch (err) {
-          console.error('Dosya yükleme hatası:', err);
-        }
-      }
+      const inspection = await inspectFiles(files);
+      setInspectionResult(inspection);
 
-      if (paths.length === 0) {
-        toast({
-          title: 'Dosya Alınamadı',
-          description: 'Seçilen dosyalar işlenemedi.',
-          type: 'error',
-        });
-        setIsProcessingFiles(false);
-        return;
+      if (inspection.exceedsLimit) {
+        // Tarayıcı bellek koruma sınırı aşıldı -> Masaüstü Yükseltme Modalı
+        setShowUpsellModal(true);
+        setStagedFiles([]);
+      } else {
+        // Sınırlar dahilinde (< 10 sayfa, < 10 MB, MSG yok) -> Tarayıcıda işlem için hazırla
+        setStagedFiles(files);
       }
-
-      // Tek bir dosya durumu
-      if (paths.length === 1) {
-        const singlePath = paths[0];
-        const lower = singlePath.toLowerCase();
-        if (lower.endsWith('.pdf')) {
-          onOpenPdf(singlePath);
-          return;
-        } else {
-          onOpenConverterWithFiles([singlePath]);
-          return;
-        }
-      }
-
-      // Birden fazla dosya: Sıvı Niyet Kartını göster
-      setDetectedFiles(paths);
-    } catch {
+    } catch (err: unknown) {
+      console.error('Evrak inceleme hatası:', err);
       toast({
-        title: 'Hata',
-        description: 'Dosyalar yüklenirken bir problem oluştu.',
+        title: 'İnceleme Hatası',
+        description: 'Dosyalar analiz edilirken beklenmeyen bir problem oluştu.',
         type: 'error',
       });
     } finally {
@@ -105,57 +103,104 @@ export const LandingHub: React.FC<LandingHubProps> = ({
     setIsDragOver(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filesArray = Array.from(e.dataTransfer.files);
-      await processFileList(filesArray);
+      const filesArray = Array.from(e.dataTransfer.files) as File[];
+      await processFiles(filesArray);
     }
   };
 
-  const handleSelectFilesClick = async () => {
+  const handleSelectFilesClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArray = Array.from(e.target.files) as File[];
+      await processFiles(filesArray);
+    }
+    // Aynı dosyaların yeniden seçilebilmesi için değeri sıfırla
+    e.target.value = '';
+  };
+
+  // Hazırlanan dosyaların tür analizleri
+  const areAllPdfs = stagedFiles.length > 0 && stagedFiles.every(isPdfFile);
+  const areAllImages = stagedFiles.length > 0 && stagedFiles.every(isSupportedImageFile);
+  const hasPdfs = stagedFiles.some(isPdfFile);
+  const hasImages = stagedFiles.some(isSupportedImageFile);
+
+  // 1-Tık Tarayıcı İçi PDF Birleştirme
+  const handleClientMerge = async () => {
+    if (stagedFiles.length === 0) return;
+    setIsExecutingClientOp(true);
+    setClientOpStatus(null);
+
     try {
-      const chosen = await api.chooseFiles('converter');
-      if (chosen && chosen.length > 0) {
-        if (chosen.length === 1) {
-          const lower = chosen[0].toLowerCase();
-          if (lower.endsWith('.pdf')) {
-            onOpenPdf(chosen[0]);
-            return;
-          } else {
-            onOpenConverterWithFiles(chosen);
-            return;
-          }
-        }
-        setDetectedFiles(chosen);
+      const pdfFiles = stagedFiles.filter(isPdfFile);
+      if (pdfFiles.length === 0) {
+        throw new Error('Birleştirilecek geçerli PDF dosyası bulunamadı.');
       }
-    } catch (err) {
-      console.error(err);
+
+      const result = await mergePdfsClientSide(pdfFiles);
+      downloadBlob(result.blob, result.filename);
+
+      const statusMsg = 'İşlem tarayıcınızda yerel ortamda tamamlandı.';
+      setClientOpStatus(statusMsg);
+      toast({
+        title: 'İşlem Başarılı',
+        description: statusMsg,
+        type: 'success',
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Birleştirme işlemi tamamlanamadı.';
+      toast({
+        title: 'Birleştirme Hatası',
+        description: message,
+        type: 'error',
+      });
+    } finally {
+      setIsExecutingClientOp(false);
     }
   };
 
-  // Tespit edilen dosyaların dökümü
-  const fileBreakdown = React.useMemo(() => {
-    let pdfCount = 0;
-    let excelCount = 0;
-    let wordCount = 0;
-    let imageCount = 0;
-    let otherCount = 0;
+  // 1-Tık Tarayıcı İçi Görselden UYAP PDF'e Dönüştürme
+  const handleClientConvertImages = async () => {
+    if (stagedFiles.length === 0) return;
+    setIsExecutingClientOp(true);
+    setClientOpStatus(null);
 
-    for (const f of detectedFiles) {
-      const lower = f.toLowerCase();
-      if (lower.endsWith('.pdf')) pdfCount++;
-      else if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) excelCount++;
-      else if (lower.endsWith('.docx') || lower.endsWith('.doc')) wordCount++;
-      else if (
-        lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg') ||
-        lower.endsWith('.tiff') ||
-        lower.endsWith('.tif')
-      )
-        imageCount++;
-      else otherCount++;
+    try {
+      const imageFiles = stagedFiles.filter(isSupportedImageFile);
+      if (imageFiles.length === 0) {
+        throw new Error('Dönüştürülecek geçerli görsel dosyası bulunamadı.');
+      }
+
+      const result = await convertImagesToPdfClientSide(imageFiles);
+      downloadBlob(result.blob, result.filename);
+
+      const statusMsg = 'İşlem tarayıcınızda yerel ortamda tamamlandı.';
+      setClientOpStatus(statusMsg);
+      toast({
+        title: 'İşlem Başarılı',
+        description: statusMsg,
+        type: 'success',
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Dönüştürme işlemi tamamlanamadı.';
+      toast({
+        title: 'Dönüştürme Hatası',
+        description: message,
+        type: 'error',
+      });
+    } finally {
+      setIsExecutingClientOp(false);
     }
-    return { pdfCount, excelCount, wordCount, imageCount, otherCount, total: detectedFiles.length };
-  }, [detectedFiles]);
+  };
+
+  // Listeyi temizleme
+  const handleClearStaged = () => {
+    setStagedFiles([]);
+    setInspectionResult(null);
+    setClientOpStatus(null);
+  };
 
   return (
     <div
@@ -166,7 +211,17 @@ export const LandingHub: React.FC<LandingHubProps> = ({
         isDragOver ? 'bg-[#F3EFEA]' : ''
       }`}
     >
-      {/* Üst Başlık ve Adli Güvenlik Göstergesi */}
+      {/* Gizli Dosya Girişi */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.png,.jpg,.jpeg,.msg,.eml,.docx,.xlsx"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Üst Başlık ve Adli Güvenlik Göstergesi + Masaüstü İndirme Butonu */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -174,7 +229,9 @@ export const LandingHub: React.FC<LandingHubProps> = ({
         className="flex items-center justify-between border-b border-[rgba(22,23,26,0.12)] pb-4 sm:pb-5 shrink-0"
       >
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#0E254A] text-[#FBFBFA] flex items-center justify-center font-black font-serif text-xl sm:text-2xl border border-[#16171A] brutal-shadow-sm shrink-0 tracking-tight select-none">P<span className="text-[#D4AF37] text-base leading-none">.</span></div>
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#0E254A] text-[#FBFBFA] flex items-center justify-center font-black font-serif text-xl sm:text-2xl border border-[#16171A] brutal-shadow-sm shrink-0 tracking-tight select-none">
+            P<span className="text-[#D4AF37] text-base leading-none">.</span>
+          </div>
           <div className="flex flex-col">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#16171A] leading-none">
               PARALEGAL.
@@ -185,8 +242,19 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </div>
         </div>
 
-        {/* Sağ Üst Güvenlik Rozeti */}
-        <div className="flex items-center">
+        {/* Sağ Üst Eylemler: Masaüstü Kurulumu Butonu ve Çevrimdışı Güvenlik Rozeti */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <a
+            href={(import.meta as any).env?.VITE_DESKTOP_DOWNLOAD_URL || '/downloads/Paralegal_Setup.exe'}
+            download="Paralegal_Setup.exe"
+            className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 bg-[#0E254A] hover:bg-[#163566] text-[#FBFBFA] border border-[#16171A] text-xs font-bold brutal-shadow-sm transition-all tracking-tight"
+            title="Sınırsız yerel işlem için Windows masaüstü kurulumunu indirin"
+          >
+            <Download className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+            <span className="hidden sm:inline">Masaüstü Sürümünü İndir (.exe)</span>
+            <span className="sm:hidden">İndir (.exe)</span>
+          </a>
+
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FFFFFF] border border-[rgba(22,23,26,0.15)] text-xs font-bold text-[#16171A] brutal-shadow-sm">
             <Shield className="w-3.5 h-3.5 text-[#0E254A] shrink-0" />
             <span className="hidden xs:inline">Çevrimdışı Güvenlik</span>
@@ -222,7 +290,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </h2>
 
           <p className="text-xs text-[#5A5D66] mt-1.5 max-w-md font-medium leading-relaxed">
-            Dosyalarınızı doğrudan sürükleyip bırakabilirsiniz. Sistem, dosya türünü algılayıp uygun işlemleri hazırlar.
+            Dosyalarınızı doğrudan sürükleyip bırakabilir veya tıklayarak seçebilirsiniz. Sistem, dosya türünü algılayıp tarayıcı içi hızlı işlemleri hazırlar.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -235,9 +303,9 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </div>
         </motion.div>
 
-        {/* BİRDEN ÇOK DOSYA BIRAKILDIĞINDA AÇILAN SIVI NİYET KARTI */}
+        {/* SINIRLAR DAHİLİNDEKİ DOSYALAR İÇİN TARAYICI İÇİ EYLEM PANELİ */}
         <AnimatePresence>
-          {detectedFiles.length > 1 && (
+          {stagedFiles.length > 0 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -245,25 +313,30 @@ export const LandingHub: React.FC<LandingHubProps> = ({
               transition={{ duration: 0.18 }}
               className="w-full bg-[#FFFFFF] border-2 border-[#16171A] brutal-shadow p-5 flex flex-col gap-4"
             >
+              {/* Üst Başlık ve Analiz Özeti */}
               <div className="flex items-center justify-between border-b border-[rgba(22,23,26,0.1)] pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 bg-[#0E254A] text-white flex items-center justify-center font-bold text-xs">
-                    {fileBreakdown.total}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-[#0E254A] text-white flex items-center justify-center font-bold text-xs border border-[#16171A] brutal-shadow-sm">
+                    {stagedFiles.length}
                   </div>
                   <div>
                     <h3 className="text-sm font-black text-[#16171A]">
-                      Toplu Dava Evrakı Algılandı
+                      {areAllPdfs
+                        ? stagedFiles.length === 1
+                          ? 'PDF Belgesi İşleme Hazır'
+                          : 'Birleştirilmeye Hazır PDF Evrakları'
+                        : areAllImages
+                        ? "UYAP PDF'e Dönüştürülecek Görseller"
+                        : 'Adli Evraklar İşleme Hazır'}
                     </h3>
                     <p className="text-[11px] text-[#5A5D66]">
-                      {[
-                        fileBreakdown.pdfCount > 0 && `${fileBreakdown.pdfCount} PDF`,
-                        fileBreakdown.excelCount > 0 && `${fileBreakdown.excelCount} Excel`,
-                        fileBreakdown.wordCount > 0 && `${fileBreakdown.wordCount} Word`,
-                        fileBreakdown.imageCount > 0 && `${fileBreakdown.imageCount} Görsel`,
-                        fileBreakdown.otherCount > 0 && `${fileBreakdown.otherCount} Diğer`,
-                      ]
-                        .filter(Boolean)
-                        .join(' • ')}
+                      {stagedFiles.length} dosya
+                      {inspectionResult && ` • Toplam ${inspectionResult.totalPages} sayfa`}
+                      {inspectionResult && ` • ${formatBytes(inspectionResult.totalSizeBytes)}`}
+                      {' • '}
+                      <span className="text-emerald-700 font-bold">
+                        Tarayıcı Bellek Sınırı Dahilinde (&lt;{MAX_CLIENT_PAGES} sayfa / &lt;{formatBytes(MAX_CLIENT_SIZE_BYTES)})
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -272,7 +345,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDetectedFiles([]);
+                    handleClearStaged();
                   }}
                   className="p-1 hover:bg-[#F3EFEA] text-[#5A5D66] hover:text-[#16171A] transition-colors"
                   title="Listeyi Temizle"
@@ -281,24 +354,79 @@ export const LandingHub: React.FC<LandingHubProps> = ({
                 </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => onOpenMergerWithFiles(detectedFiles)}
-                  className="btn-primary-court w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2"
+              {/* İşlem Durum Mesajı */}
+              {clientOpStatus && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-[#EBF7EE] border border-emerald-300 p-3 flex items-center justify-between text-xs font-bold text-emerald-950 brutal-shadow-sm"
                 >
-                  <Layers className="w-4 h-4" />
-                  <span>Tek Bir PDF Olarak Birleştir</span>
-                </button>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>{clientOpStatus}</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 uppercase tracking-widest font-mono">
+                    UYAP UYUMLU
+                  </span>
+                </motion.div>
+              )}
 
-                <button
-                  type="button"
-                  onClick={() => onOpenConverterWithFiles(detectedFiles)}
-                  className="btn-chancery bg-[#FFFFFF] text-[#16171A] w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#F3EFEA]"
-                >
-                  <FileImage className="w-4 h-4 text-[#0E254A]" />
-                  <span>Ayrı Ayrı PDF'lere Dönüştür</span>
-                </button>
+              {/* Hızlı Eylem Butonları */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                {/* PDF'ler için Tarayıcıda Birleştir ve İndir */}
+                {(areAllPdfs || hasPdfs) && (
+                  <button
+                    type="button"
+                    disabled={isExecutingClientOp}
+                    onClick={handleClientMerge}
+                    className="btn-primary-court w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Layers className="w-4 h-4 text-[#D4AF37]" />
+                    <span>
+                      {isExecutingClientOp
+                        ? 'Birleştiriliyor...'
+                        : 'Tarayıcıda Birleştir ve İndir'}
+                    </span>
+                  </button>
+                )}
+
+                {/* Görseller için UYAP PDF'e Dönüştür ve İndir */}
+                {(areAllImages || hasImages) && (
+                  <button
+                    type="button"
+                    disabled={isExecutingClientOp}
+                    onClick={handleClientConvertImages}
+                    className="btn-primary-court w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <FileImage className="w-4 h-4 text-[#D4AF37]" />
+                    <span>
+                      {isExecutingClientOp
+                        ? 'Dönüştürülüyor...'
+                        : "UYAP PDF'e Dönüştür ve İndir"}
+                    </span>
+                  </button>
+                )}
+
+                {/* Tek PDF durumunda Redaktör Açma Seçeneği */}
+                {areAllPdfs && stagedFiles.length === 1 && (
+                  <button
+                    type="button"
+                    disabled={isExecutingClientOp}
+                    onClick={async () => {
+                      try {
+                        const path = await api.uploadFile(stagedFiles[0]);
+                        if (path) onOpenPdf(path);
+                      } catch {
+                        // Web ortamında sunucu yoksa doğrudan birleştirip indir
+                        handleClientMerge();
+                      }
+                    }}
+                    className="btn-chancery bg-[#FFFFFF] text-[#16171A] w-full sm:flex-1 py-3 px-4 font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#F3EFEA]"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-[#0E254A]" />
+                    <span>Redaktörde Aç (TCKN Kazı)</span>
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -400,6 +528,21 @@ export const LandingHub: React.FC<LandingHubProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Alt Bilgi & Hukuki Mahremiyet Güvencesi (Dignified Chancery Assurance) */}
+      <div className="pt-4 pb-1 border-t border-[rgba(22,23,26,0.08)] flex items-center justify-center shrink-0">
+        <p className="text-[11px] sm:text-xs text-[#5A5D66] font-medium tracking-tight text-center select-none flex items-center justify-center gap-2">
+          <Shield className="w-3.5 h-3.5 text-[#0E254A] shrink-0" />
+          <span>Tüm işlemler tarayıcınızda yerel ortamda yürütülür; sunucuya hiçbir veri veya dosya aktarılmaz.</span>
+        </p>
+      </div>
+
+      {/* Tarayıcı Sınırını Aşan Durumlar İçin Masaüstü Yükseltme Modalı */}
+      <DesktopUpsellModal
+        isOpen={showUpsellModal}
+        onClose={() => setShowUpsellModal(false)}
+        inspection={inspectionResult}
+      />
     </div>
   );
 };

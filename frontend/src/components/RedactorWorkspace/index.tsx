@@ -334,7 +334,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
 
-    const file = Array.from(files).find(
+    const file = (Array.from(files) as File[]).find(
       (f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf'
     );
     if (!file) {

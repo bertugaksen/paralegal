@@ -388,7 +388,11 @@ class TestMsgConverter:
         with open(dummy_pst, "wb") as f:
             f.write(b"DUMMY_PST_DATA")
 
-        with patch("pypff.file", return_value=mock_file):
+        mock_pypff = MagicMock()
+        mock_pypff.file.return_value = mock_file
+        with patch.dict("sys.modules", {"pypff": mock_pypff}), \
+             patch("core.msg_converter.HAS_PYPFF", True), \
+             patch("core.msg_converter.pypff", mock_pypff, create=True):
             results = MsgConverter.extract_pst_ost_data(dummy_pst)
             assert len(results) == 1
             assert results[0]["subject"] == "PST Delil İletisi"
