@@ -504,7 +504,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
                         }`}
                         title="Tablonun sütun sayısına göre (≥6 sütun ise Yatay) otomatik belirler"
                       >
-                        ⚡ Akıllı Otomatik
+                        Otomatik (Akıllı)
                       </button>
                       <button
                         type="button"
@@ -516,7 +516,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
                         }`}
                         title="Tüm tabloları yatay A4 (Landscape) sayfaya basar"
                       >
-                        ↔ Yatay (Geniş Tablo)
+                        Yatay (Geniş Tablo)
                       </button>
                       <button
                         type="button"
@@ -528,7 +528,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
                         }`}
                         title="Dikey A4 (Portrait) sayfaya basar"
                       >
-                        ↕ Dikey
+                        Dikey
                       </button>
                     </div>
                   </div>
@@ -706,7 +706,7 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
 
                             {isExcel ? (
                               <span className="text-[10px] text-[#575A65] font-semibold">
-                                {excelOrientation === 'auto' ? '⚡ Akıllı UYAP' : excelOrientation === 'landscape' ? '↔ Yatay' : '↕ Dikey'}
+                                {excelOrientation === 'auto' ? 'Otomatik' : excelOrientation === 'landscape' ? 'Yatay' : 'Dikey'}
                               </span>
                             ) : (
                               rot > 0 && (
@@ -822,9 +822,9 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
                   }`}
                 >
                   {isNearUyapLimit ? (
-                    <span>⚠️ 10 MB UYAP sınırına yakın; sistem otomatik olarak optimize edecektir.</span>
+                    <span>10 MB UYAP sınırına yakın; sistem otomatik olarak optimize edecektir.</span>
                   ) : (
-                    <span>🛡️ UYAP 10 MB Sınırında Güvende</span>
+                    <span>UYAP 10 MB Standartlarına Uygun</span>
                   )}
                 </div>
               </div>

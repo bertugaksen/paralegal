@@ -435,7 +435,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                   </span>
                 </div>
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-2 py-0.5">
-                  ⚡ UYAP 10 MB Koruma Aktif
+                  UYAP 10 MB Koruma Aktif
                 </span>
               </div>
 
@@ -550,17 +550,17 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                             {info && (
                               <>
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 bg-[#F4EFEA] border border-[#121316] text-[#121316]">
-                                  📄 {info.page_count} Sayfa
+                                  {info.page_count} Sayfa
                                 </span>
                                 <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 bg-[#F4EFEA] border border-[#121316] text-[#121316]">
-                                  💾 {info.size_formatted}
+                                  {info.size_formatted}
                                 </span>
                               </>
                             )}
 
                             {info?.is_encrypted && (
                               <span className="text-[10px] font-bold px-1.5 py-0.2 bg-red-100 text-red-700 border border-red-300">
-                                🔒 Şifreli
+                                Şifreli Belge
                               </span>
                             )}
                           </div>
@@ -631,7 +631,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
 
               {outputDir && (
                 <span className="text-[11px] font-mono text-[#575A65] truncate max-w-xs" title={outputDir}>
-                  📁 {outputDir}
+                  {outputDir}
                 </span>
               )}
             </div>
@@ -697,7 +697,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
                   <span className="font-bold text-[#121316]">{mergedResult.size_formatted}</span>
                 </div>
                 <div className="pt-1.5 border-t border-[#121316]/10 text-[11px] truncate text-[#121316]" title={mergedResult.output_path}>
-                  📍 {mergedResult.output_path}
+                  {mergedResult.output_path}
                 </div>
               </div>
 

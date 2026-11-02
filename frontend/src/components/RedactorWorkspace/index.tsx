@@ -1187,7 +1187,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
           >
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5 text-xs sm:text-sm text-[#121316] font-bold leading-snug">
-                <span>⚠️ Adli Güvenlik Uyarısı: Bu belgede dijital metin katmanı tespit edilemedi (Taranmış / Görsel Evrak). Otomatik KVKK taraması yapılamamıştır. Hassas verileri kapatmak için lütfen araç çubuğundaki 'Bant Çekme Modu'nu kullanın.</span>
+                <span>Adli Güvenlik Uyarısı: Bu belgede dijital metin katmanı tespit edilemedi (Taranmış / Görsel Evrak). Otomatik KVKK taraması yapılamamıştır. Hassas verileri kapatmak için lütfen araç çubuğundaki 'Bant Çekme Modu'nu kullanın.</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {!drawToolActive && (
@@ -1680,7 +1680,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
                   title="Hızlı İnceleme Kısayollarını Göster"
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>⚡ Hızlı İnceleme [J, K, Space, W]</span>
+                  <span>Hızlı İnceleme [J, K, Space, W]</span>
                 </motion.button>
               )}
             </AnimatePresence>

@@ -53,7 +53,7 @@ export const SealingModal: React.FC<SealingModalProps> = ({
         <div className="bg-[#0E254A] text-white px-5 py-3.5 flex items-center justify-between border-b border-[#16171A]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-[#8B1E1E] text-white flex items-center justify-center font-bold text-xs rounded-none border border-white/30">
-              ⚖️
+              <Stamp className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-xs sm:text-sm font-black tracking-tight uppercase">
@@ -132,7 +132,7 @@ export const SealingModal: React.FC<SealingModalProps> = ({
             />
             <div className="text-xs">
               <span className="font-bold text-[#16171A] block">
-                📜 Belgenin Sonuna Resmi "Adli KVKK İmha Beratı" Sayfası Ekle
+                Belgenin Sonuna Resmi "Adli KVKK İmha Beratı" Sayfası Ekle
               </span>
               <span className="text-[10px] text-[#5A5D66] block mt-0.5">
                 Mahkemeye ve karşı tarafa delil olarak sunulabilir; SHA-256 parmak izi, imha tarihi ve yasal uyumluluk tasdiki içerir.

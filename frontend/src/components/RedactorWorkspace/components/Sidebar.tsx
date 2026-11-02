@@ -487,7 +487,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : 'bg-white text-[#5A5D66] border border-[rgba(22,23,26,0.15)] hover:text-[#16171A]'
                 }`}
               >
-                📑 Kartlar
+                Kartlar
               </button>
               <button
                 type="button"
@@ -499,7 +499,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
                 title="Yüksek Yoğunluklu Adli Veri Matrisi (35-40 satır)"
               >
-                📊 Matris (Audit Grid)
+                Denetim Matrisi
               </button>
             </div>
           </div>
@@ -828,7 +828,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {whitelist.length === 0 ? (
               <p className="text-xs text-[#575A65] bg-[#F4EFEA] p-3 border-2 border-dashed border-[#121316]/30 leading-relaxed">
-                Henüz muaf tutulan kelime yok. Veri listesindeki kalkan (🛡️) butonuna basarak büro unvanı veya vekil ismini tüm belgede sansürden muaf tutabilirsiniz.
+                Henüz muaf tutulan kelime yok. Veri listesindeki kalkan simgesine basarak büro unvanı veya vekil ismini tüm belgede sansürden muaf tutabilirsiniz.
               </p>
             ) : (
               <div className="space-y-1.5">
