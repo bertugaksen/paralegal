@@ -6,7 +6,6 @@ import {
   AlertOctagon,
   HardDrive,
   ShieldCheck,
-  FileCheck2,
   FileText
 } from 'lucide-react';
 import { InspectionResult, formatBytes, MAX_CLIENT_PAGES, MAX_CLIENT_SIZE_BYTES } from '../services/clientPdfEngine';
@@ -14,13 +13,21 @@ import { InspectionResult, formatBytes, MAX_CLIENT_PAGES, MAX_CLIENT_SIZE_BYTES 
 export interface DesktopUpsellModalProps {
   isOpen: boolean;
   onClose: () => void;
-  inspection: InspectionResult | null;
+  inspection?: InspectionResult | null;
+  title?: string;
+  subtitle?: string;
+  customMessage?: string;
+  customReasons?: string[];
 }
 
 export const DesktopUpsellModal: React.FC<DesktopUpsellModalProps> = ({
   isOpen,
   onClose,
-  inspection,
+  inspection = null,
+  title = 'Masaüstü Sürümü Gereklidir',
+  subtitle = 'Adli Evrak Koruma Bildirimi',
+  customMessage,
+  customReasons,
 }) => {
   // ESC tuşuna basıldığında modalı kapat
   useEffect(() => {
@@ -36,12 +43,13 @@ export const DesktopUpsellModal: React.FC<DesktopUpsellModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !inspection) {
+  if (!isOpen) {
     return null;
   }
 
-  const exceedsPages = inspection.totalPages > MAX_CLIENT_PAGES;
-  const exceedsSize = inspection.totalSizeBytes > MAX_CLIENT_SIZE_BYTES;
+  const exceedsPages = inspection ? inspection.totalPages > MAX_CLIENT_PAGES : false;
+  const exceedsSize = inspection ? inspection.totalSizeBytes > MAX_CLIENT_SIZE_BYTES : false;
+  const reasonsList = customReasons || (inspection ? inspection.reasons : []);
 
   return (
     <AnimatePresence>
@@ -68,13 +76,13 @@ export const DesktopUpsellModal: React.FC<DesktopUpsellModalProps> = ({
               </div>
               <div>
                 <span className="text-[10px] font-black tracking-widest uppercase text-[#5A5D66]">
-                  Adli Evrak Koruma Bildirimi
+                  {subtitle}
                 </span>
                 <h2
                   id="upsell-modal-title"
                   className="text-lg sm:text-xl font-black text-[#16171A] tracking-tight leading-snug"
                 >
-                  Masaüstü Sürümü Gereklidir
+                  {title}
                 </h2>
               </div>
             </div>
@@ -93,12 +101,12 @@ export const DesktopUpsellModal: React.FC<DesktopUpsellModalProps> = ({
           {/* Gerekçe ve Hacim Analiz Kutusu */}
           <div className="bg-[#F3EFEA] border-l-4 border-[#0E254A] p-4 flex flex-col gap-2.5">
             <p className="text-xs font-bold text-[#16171A] leading-relaxed">
-              Bu işlem tarayıcı bellek koruma sınırını (10 sayfa / 10 MB) aşmaktadır.
+              {customMessage || 'Bu işlem tarayıcı bellek koruma sınırını (10 sayfa / 10 MB) aşmaktadır.'}
             </p>
 
-            {inspection.reasons.length > 0 && (
+            {reasonsList.length > 0 && (
               <ul className="text-xs text-[#5A5D66] space-y-1.5 list-disc list-inside">
-                {inspection.reasons.map((reason, index) => (
+                {reasonsList.map((reason, index) => (
                   <li key={index} className="leading-relaxed">
                     {reason}
                   </li>
@@ -107,39 +115,41 @@ export const DesktopUpsellModal: React.FC<DesktopUpsellModalProps> = ({
             )}
 
             {/* Sayısal Göstergeler */}
-            <div className="grid grid-cols-2 gap-3 mt-2 pt-2.5 border-t border-[rgba(22,23,26,0.1)]">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-[#5A5D66] uppercase tracking-wider">
-                  Tespit Edilen Sayfa
-                </span>
-                <span
-                  className={`text-sm font-black font-mono ${
-                    exceedsPages ? 'text-[#8B1E1E]' : 'text-[#16171A]'
-                  }`}
-                >
-                  {inspection.totalPages} Sayfa{' '}
-                  <span className="text-[11px] font-normal text-[#5A5D66]">
-                    (Tarayıcı Üst Sınırı: {MAX_CLIENT_PAGES})
+            {inspection && (
+              <div className="grid grid-cols-2 gap-3 mt-2 pt-2.5 border-t border-[rgba(22,23,26,0.1)]">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-[#5A5D66] uppercase tracking-wider">
+                    Tespit Edilen Sayfa
                   </span>
-                </span>
-              </div>
+                  <span
+                    className={`text-sm font-black font-mono ${
+                      exceedsPages ? 'text-[#8B1E1E]' : 'text-[#16171A]'
+                    }`}
+                  >
+                    {inspection.totalPages} Sayfa{' '}
+                    <span className="text-[11px] font-normal text-[#5A5D66]">
+                      (Tarayıcı Üst Sınırı: {MAX_CLIENT_PAGES})
+                    </span>
+                  </span>
+                </div>
 
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-[#5A5D66] uppercase tracking-wider">
-                  Toplam Dosya Boyutu
-                </span>
-                <span
-                  className={`text-sm font-black font-mono ${
-                    exceedsSize ? 'text-[#8B1E1E]' : 'text-[#16171A]'
-                  }`}
-                >
-                  {formatBytes(inspection.totalSizeBytes)}{' '}
-                  <span className="text-[11px] font-normal text-[#5A5D66]">
-                    (Tarayıcı Üst Sınırı: {formatBytes(MAX_CLIENT_SIZE_BYTES)})
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-[#5A5D66] uppercase tracking-wider">
+                    Toplam Dosya Boyutu
                   </span>
-                </span>
+                  <span
+                    className={`text-sm font-black font-mono ${
+                      exceedsSize ? 'text-[#8B1E1E]' : 'text-[#16171A]'
+                    }`}
+                  >
+                    {formatBytes(inspection.totalSizeBytes)}{' '}
+                    <span className="text-[11px] font-normal text-[#5A5D66]">
+                      (Tarayıcı Üst Sınırı: {formatBytes(MAX_CLIENT_SIZE_BYTES)})
+                    </span>
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Masaüstü Sürümü Avantajları (Hukuk Büroları İçin Kesintisiz İşlem) */}

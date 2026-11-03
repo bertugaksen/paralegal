@@ -26,6 +26,7 @@ import {
   MAX_CLIENT_PAGES,
   MAX_CLIENT_SIZE_BYTES
 } from '../services/clientPdfEngine';
+import { isWebMode } from '../services/environment';
 import { DesktopUpsellModal } from './DesktopUpsellModal';
 
 interface LandingHubProps {
@@ -51,6 +52,12 @@ export const LandingHub: React.FC<LandingHubProps> = ({
   const [inspectionResult, setInspectionResult] = useState<InspectionResult | null>(null);
   const [clientOpStatus, setClientOpStatus] = useState<string | null>(null);
   const [showUpsellModal, setShowUpsellModal] = useState<boolean>(false);
+  const [upsellConfig, setUpsellConfig] = useState<{
+    title?: string;
+    subtitle?: string;
+    message?: string;
+    reasons?: string[];
+  }>({});
 
   // Sürükle-bırak olayları
   const handleDragOver = (e: React.DragEvent) => {
@@ -78,6 +85,7 @@ export const LandingHub: React.FC<LandingHubProps> = ({
 
       if (inspection.exceedsLimit) {
         // Tarayıcı bellek koruma sınırı aşıldı -> Masaüstü Yükseltme Modalı
+        setUpsellConfig({});
         setShowUpsellModal(true);
         setStagedFiles([]);
       } else {
@@ -413,11 +421,24 @@ export const LandingHub: React.FC<LandingHubProps> = ({
                     type="button"
                     disabled={isExecutingClientOp}
                     onClick={async () => {
+                      if (isWebMode()) {
+                        setInspectionResult(null);
+                        setUpsellConfig({
+                          title: 'Masaüstü Sürümü Gereklidir',
+                          subtitle: 'KVKK & Adli Evrak Koruma Bildirimi',
+                          message: 'Adli Belge Anonimleştirme (TCKN, isim, sicil no ve kurum bilgilerini kalıcı kazıma) motoru %100 yerel veri gizliliği ve güvenlik için Python masaüstü çekirdeği gerektirir.',
+                          reasons: [
+                            'Hassas hukuki evraklarınız buluta yüklenmeden yerel bilgisayarınızda taranır.',
+                            'Yapay zeka ve adli mühür sertifikası masaüstü çekirdeğiyle oluşturulur.'
+                          ]
+                        });
+                        setShowUpsellModal(true);
+                        return;
+                      }
                       try {
                         const path = await api.uploadFile(stagedFiles[0]);
                         if (path) onOpenPdf(path);
                       } catch {
-                        // Web ortamında sunucu yoksa doğrudan birleştirip indir
                         handleClientMerge();
                       }
                     }}
@@ -446,8 +467,42 @@ export const LandingHub: React.FC<LandingHubProps> = ({
             <div
               role="button"
               tabIndex={0}
-              onClick={() => onSelectMode('redactor')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelectMode('redactor')}
+              onClick={() => {
+                if (isWebMode()) {
+                  setInspectionResult(null);
+                  setUpsellConfig({
+                    title: 'Masaüstü Sürümü Gereklidir',
+                    subtitle: 'KVKK & Adli Evrak Koruma Bildirimi',
+                    message: 'Adli Belge Anonimleştirme (TCKN, isim, sicil no ve kurum bilgilerini kalıcı kazıma) motoru %100 yerel veri gizliliği ve güvenlik için Python masaüstü çekirdeği gerektirir.',
+                    reasons: [
+                      'Hassas hukuki evraklarınız buluta yüklenmeden yerel bilgisayarınızda taranır.',
+                      'Yapay zeka ve adli mühür sertifikası masaüstü çekirdeğiyle oluşturulur.'
+                    ]
+                  });
+                  setShowUpsellModal(true);
+                } else {
+                  onSelectMode('redactor');
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (isWebMode()) {
+                    setInspectionResult(null);
+                    setUpsellConfig({
+                      title: 'Masaüstü Sürümü Gereklidir',
+                      subtitle: 'KVKK & Adli Evrak Koruma Bildirimi',
+                      message: 'Adli Belge Anonimleştirme (TCKN, isim, sicil no ve kurum bilgilerini kalıcı kazıma) motoru %100 yerel veri gizliliği ve güvenlik için Python masaüstü çekirdeği gerektirir.',
+                      reasons: [
+                        'Hassas hukuki evraklarınız buluta yüklenmeden yerel bilgisayarınızda taranır.',
+                        'Yapay zeka ve adli mühür sertifikası masaüstü çekirdeğiyle oluşturulur.'
+                      ]
+                    });
+                    setShowUpsellModal(true);
+                  } else {
+                    onSelectMode('redactor');
+                  }
+                }
+              }}
               className="brutal-card-interactive p-4 sm:p-5 bg-[#FFFFFF] flex flex-col justify-between min-h-[160px] group"
             >
               <div>
@@ -540,8 +595,15 @@ export const LandingHub: React.FC<LandingHubProps> = ({
       {/* Tarayıcı Sınırını Aşan Durumlar İçin Masaüstü Yükseltme Modalı */}
       <DesktopUpsellModal
         isOpen={showUpsellModal}
-        onClose={() => setShowUpsellModal(false)}
+        onClose={() => {
+          setShowUpsellModal(false);
+          setUpsellConfig({});
+        }}
         inspection={inspectionResult}
+        title={upsellConfig.title}
+        subtitle={upsellConfig.subtitle}
+        customMessage={upsellConfig.message}
+        customReasons={upsellConfig.reasons}
       />
     </div>
   );

@@ -21,6 +21,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { PDFInfo } from '../../types';
+import { isWebMode } from '../../services/environment';
+import { mergePdfsClientSide, downloadBlob, formatBytes } from '../../services/clientPdfEngine';
+import { PDFDocument } from 'pdf-lib';
+import { DesktopUpsellModal } from '../DesktopUpsellModal';
 
 interface MergerWorkspaceProps {
   onBackToHub: () => void;
@@ -57,6 +61,72 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const clientFilesMap = React.useRef<Map<string, File>>(new Map());
+  const [showUpsellModal, setShowUpsellModal] = useState<boolean>(false);
+
+  // Web ortamında seçilen File nesnelerini işleme
+  const handleProcessClientFiles = async (files: File[]) => {
+    const pdfFiles = files.filter(
+      (f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf'
+    );
+    if (pdfFiles.length === 0) {
+      toast({
+        title: 'Geçersiz Dosya Formatı',
+        description: 'Yalnızca .pdf uzantılı dosyalar birleştirilebilir.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    setIsLoadingInfo(true);
+    for (const file of pdfFiles) {
+      clientFilesMap.current.set(file.name, file);
+      try {
+        const buf = await file.arrayBuffer();
+        const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+        const pages = doc.getPageCount();
+        setPdfInfos((prev) => ({
+          ...prev,
+          [file.name]: {
+            path: file.name,
+            filename: file.name,
+            page_count: pages,
+            is_encrypted: false,
+            size_bytes: file.size,
+            size_formatted: formatBytes(file.size),
+            has_toc: false,
+          },
+        }));
+      } catch {
+        setPdfInfos((prev) => ({
+          ...prev,
+          [file.name]: {
+            path: file.name,
+            filename: file.name,
+            page_count: 1,
+            is_encrypted: false,
+            size_bytes: file.size,
+            size_formatted: formatBytes(file.size),
+            has_toc: false,
+          },
+        }));
+      }
+    }
+    setIsLoadingInfo(false);
+
+    setSelectedPaths((prev) => {
+      const set = new Set(prev);
+      const toAdd = pdfFiles.map((f) => f.name).filter((n) => !set.has(n));
+      return [...prev, ...toAdd];
+    });
+
+    toast({
+      title: 'PDF Eklendi',
+      description: `${pdfFiles.length} adet PDF belgesi listeye eklendi.`,
+      type: 'success',
+    });
+  };
 
   // Seçilen PDF'lerin bilgilerini (sayfa sayısı, boyut) çek
   useEffect(() => {
@@ -122,6 +192,10 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
 
   // Dosya Ekleme Diyalogu
   const handleAddPdfs = async () => {
+    if (isWebMode()) {
+      fileInputRef.current?.click();
+      return;
+    }
     try {
       const chosen = await api.choosePdfs();
       if (chosen && chosen.length > 0) {
@@ -171,6 +245,10 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
     }
 
     const files = Array.from(e.dataTransfer.files || []) as File[];
+    if (isWebMode()) {
+      await handleProcessClientFiles(files);
+      return;
+    }
     const pdfFiles = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
 
     if (pdfFiles.length === 0) {
@@ -259,13 +337,53 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
     }
 
     setIsMerging(true);
+
+    if (isWebMode()) {
+      setMergeProgress('Dava dosyası tarayıcınızda hazırlanıyor...');
+      try {
+        const orderedFiles = selectedPaths
+          .map((p) => clientFilesMap.current.get(p))
+          .filter((f): f is File => !!f);
+
+        if (orderedFiles.length < 2) {
+          throw new Error('Dosyalar tarayıcı hafızasında bulunamadı. Lütfen dosyaları tekrar seçin.');
+        }
+
+        const result = await mergePdfsClientSide(orderedFiles, addBookmarks);
+        downloadBlob(result.blob, result.filename);
+
+        setMergedResult({
+          output_path: result.filename,
+          total_pages: result.totalPages,
+          file_count: orderedFiles.length,
+          size_formatted: formatBytes(result.sizeBytes),
+        });
+
+        toast({
+          title: 'Birleştirme Tamamlandı',
+          description: `${orderedFiles.length} adet PDF başarıyla birleştirildi ve indirildi (${result.totalPages} sayfa).`,
+          type: 'success',
+        });
+      } catch (e: any) {
+        toast({
+          title: 'Birleştirme Hatası',
+          description: e.message || 'PDF dosyaları birleştirilirken beklenmeyen bir hata oluştu.',
+          type: 'error',
+        });
+      } finally {
+        setIsMerging(false);
+        setMergeProgress('');
+      }
+      return;
+    }
+
     setMergeProgress('Dava dosyası hazırlanıyor ve sayfalar taranıyor...');
 
     try {
       // Hedef çıktı yolu belirle
       let targetOutputPath: string | undefined = undefined;
       if (outputDir) {
-        const firstStem = (selectedPaths[0].split(/[/\\]/).pop() || 'dosya').replace(/\.pdf$/i, '');
+        const firstStem = (selectedPaths[0].split(/[\/\\]/).pop() || 'dosya').replace(/\.pdf$/i, '');
         targetOutputPath = `${outputDir}\\${firstStem}_birlestirilmis.pdf`;
       }
 
@@ -297,6 +415,22 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#F4EFEA] text-[#121316] select-none pb-28">
+      {/* Gizli Tarayıcı Dosya Seçici */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={async (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            const filesArray = Array.from(e.target.files) as File[];
+            await handleProcessClientFiles(filesArray);
+            e.target.value = '';
+          }
+        }}
+      />
+
       {/* Üst Navigasyon Çubuğu */}
       <header className="sticky top-0 z-40 bg-[#FFFFFF] border-b-2 border-[#121316] px-4 sm:px-6 py-3.5 brutal-shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -703,29 +837,40 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
 
               {/* Aksiyon Butonları */}
               <div className="flex flex-col sm:flex-row gap-2.5">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await api.openDirectory(mergedResult.output_path);
-                    } catch {
-                      toast({
-                        title: 'Klasör Açılamadı',
-                        description: 'Dosya konumu açılamadı.',
-                        type: 'error',
-                      });
-                    }
-                  }}
-                  className="brutal-btn flex-1 py-2.5 px-3 bg-[#121316] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#1E3A8A]"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Klasörde Göster</span>
-                </button>
+                {!isWebMode() ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.openDirectory(mergedResult.output_path);
+                      } catch {
+                        toast({
+                          title: 'Klasör Açılamadı',
+                          description: 'Dosya konumu açılamadı.',
+                          type: 'error',
+                        });
+                      }
+                    }}
+                    className="brutal-btn flex-1 py-2.5 px-3 bg-[#121316] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#1E3A8A]"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Klasörde Göster</span>
+                  </button>
+                ) : (
+                  <div className="flex-1 py-2.5 px-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>İndirilenlere Kaydedildi</span>
+                  </div>
+                )}
 
                 {onOpenInRedactor && (
                   <button
                     type="button"
                     onClick={() => {
+                      if (isWebMode()) {
+                        setShowUpsellModal(true);
+                        return;
+                      }
                       const target = mergedResult.output_path;
                       setMergedResult(null);
                       onOpenInRedactor(target);
@@ -749,6 +894,19 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Web Ortamında Masaüstü Yükseltme Modalı */}
+      <DesktopUpsellModal
+        isOpen={showUpsellModal}
+        onClose={() => setShowUpsellModal(false)}
+        title="Masaüstü Sürümü Gereklidir"
+        subtitle="KVKK & Adli Evrak Koruma Bildirimi"
+        customMessage="Adli Belge Anonimleştirme (TCKN, isim, sicil no ve kurum bilgilerini kalıcı kazıma) motoru %100 yerel veri gizliliği ve güvenlik için Python masaüstü çekirdeği gerektirir."
+        customReasons={[
+          "Hassas hukuki evraklarınız buluta yüklenmeden yerel bilgisayarınızda taranır.",
+          "Yapay zeka ve adli mühür sertifikası masaüstü çekirdeğiyle oluşturulur."
+        ]}
+      />
     </div>
   );
 };

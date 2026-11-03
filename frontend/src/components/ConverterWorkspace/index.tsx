@@ -24,6 +24,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../../api';
+import { isWebMode } from '../../services/environment';
+import { convertImagesToPdfClientSide, downloadBlob, formatBytes, isSupportedImageFile } from '../../services/clientPdfEngine';
+import { DesktopUpsellModal } from '../DesktopUpsellModal';
 import { useToast } from '../../context/ToastContext';
 
 interface ConverterWorkspaceProps {
@@ -43,6 +46,9 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
   // Sürükle-Bırak Satır Yeniden Sıralama Durumu
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const clientFilesMap = React.useRef<Map<string, File>>(new Map());
+  const [showUpsellModal, setShowUpsellModal] = useState<boolean>(false);
 
   // Dosya Boyutları Önbelleği
   const [fileSizes, setFileSizes] = useState<Record<string, { size_bytes: number; size_formatted: string }>>({});
@@ -187,8 +193,41 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
   const isNearUyapLimit = totalSizeMB > 9.5;
 
 
+  // Web ortamında seçilen dosyaları işleme
+  const handleProcessClientFiles = async (files: File[]) => {
+    const hasOfficeOrMsg = files.some((f) => {
+      const lower = f.name.toLowerCase();
+      return lower.endsWith('.msg') || lower.endsWith('.eml') || lower.endsWith('.docx') || lower.endsWith('.xlsx');
+    });
+
+    if (hasOfficeOrMsg) {
+      setShowUpsellModal(true);
+    }
+
+    const validImages = files.filter(isSupportedImageFile);
+    if (validImages.length === 0 && !hasOfficeOrMsg) {
+      toast.error('Desteklenen görsel veya belge formatı bulunamadı.');
+      return;
+    }
+
+    for (const f of validImages) {
+      clientFilesMap.current.set(f.name, f);
+    }
+
+    setSelectedPaths((prev) => {
+      const set = new Set(prev);
+      const toAdd = validImages.map((f) => f.name).filter((n) => !set.has(n));
+      return [...prev, ...toAdd];
+    });
+    setResultMessage(null);
+  };
+
   // Dosya Seçim Dialogu
   const handleSelectFiles = async () => {
+    if (isWebMode()) {
+      fileInputRef.current?.click();
+      return;
+    }
     try {
       const paths = await api.chooseFiles();
       if (paths && paths.length > 0) {
@@ -251,6 +290,39 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
   const handleConvert = async () => {
     if (selectedPaths.length === 0) return;
 
+    if (isWebMode()) {
+      const imageFiles = selectedPaths
+        .map((p) => clientFilesMap.current.get(p))
+        .filter((f): f is File => !!f);
+
+      if (imageFiles.length === 0) {
+        toast.error('Dönüştürülecek geçerli görsel bulunamadı.');
+        return;
+      }
+
+      setIsConverting(true);
+      setResultMessage(null);
+      try {
+        const result = await convertImagesToPdfClientSide(imageFiles);
+        downloadBlob(result.blob, result.filename);
+        setResultMessage({
+          success: true,
+          text: `${imageFiles.length} adet görsel başarıyla UYAP PDF formatına dönüştürüldü ve indirildi.`,
+          files: [result.filename],
+        });
+        toast.success('Dönüştürme tamamlandı ve indirildi.');
+      } catch (err: any) {
+        setResultMessage({
+          success: false,
+          text: `Hata oluştu: ${err.message}`,
+          files: [],
+        });
+      } finally {
+        setIsConverting(false);
+      }
+      return;
+    }
+
     // Hedef kayıt klasörü: Kullanıcı önceden belirlemediyse sor
     let chosenDir = targetDirectory;
     if (!chosenDir) {
@@ -311,6 +383,22 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4EFEA] text-[#121316]">
+      {/* Gizli Tarayıcı Dosya Seçici */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".png,.jpg,.jpeg,.pdf,.docx,.xlsx,.msg,.eml"
+        className="hidden"
+        onChange={async (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            const filesArray = Array.from(e.target.files) as File[];
+            await handleProcessClientFiles(filesArray);
+            e.target.value = '';
+          }
+        }}
+      />
+
       {/* Top Header */}
       <header className="h-16 border-b-2 border-[#121316] bg-[#FFFFFF] px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -906,6 +994,19 @@ export const ConverterWorkspace: React.FC<ConverterWorkspaceProps> = ({
 
 
       </main>
+
+      {/* Web Ortamında Masaüstü Yükseltme Modalı */}
+      <DesktopUpsellModal
+        isOpen={showUpsellModal}
+        onClose={() => setShowUpsellModal(false)}
+        title="Masaüstü Sürümü Gereklidir"
+        subtitle="Ofis & E-Posta Dönüştürme Bildirimi"
+        customMessage="Word (.docx), Excel (.xlsx) ve Outlook (.msg) dönüştürme motoru sistem düzeyinde yerel masaüstü dönüştürücü çekirdeği gerektirdiğinden yalnızca Masaüstü uygulamasında çalışmaktadır."
+        customReasons={[
+          "Word ve Excel tablolarının adli formatta ve UYAP uyumlu dönüştürülmesi yerel masaüstü kütüphaneleriyle yürütülür.",
+          "Outlook (.msg) iletileri ve ekleri yerel ortamda ayrıştırılır; buluta hiçbir veri aktarılmaz."
+        ]}
+      />
     </div>
   );
 };

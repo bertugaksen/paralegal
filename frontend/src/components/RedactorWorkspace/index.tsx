@@ -16,6 +16,8 @@ import { Sidebar } from './components/Sidebar';
 import { ThumbnailStrip } from './components/ThumbnailStrip';
 import { CommandPalette } from './components/CommandPalette';
 import { SealingModal } from './components/SealingModal';
+import { isWebMode } from '../../services/environment';
+import { DesktopUpsellModal } from '../DesktopUpsellModal';
 import { FilterSettings, PDFMeta, RedactionItem } from '../../types';
 import { useToast } from '../../context/ToastContext';
 
@@ -50,6 +52,7 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isSealingModalOpen, setIsSealingModalOpen] = useState<boolean>(false);
+  const [showUpsellModal, setShowUpsellModal] = useState<boolean>(false);
 
   const selectedRedactionIdRef = useRef<string | null>(selectedRedactionId);
   useEffect(() => {
@@ -334,6 +337,11 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
 
+    if (isWebMode()) {
+      setShowUpsellModal(true);
+      return;
+    }
+
     const file = (Array.from(files) as File[]).find(
       (f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf'
     );
@@ -355,6 +363,10 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
 
   // Dosya Seçme
   const handleSelectFile = async () => {
+    if (isWebMode()) {
+      setShowUpsellModal(true);
+      return;
+    }
     try {
       const chosen = await api.chooseFile('pdf');
       if (chosen) {
@@ -1252,6 +1264,23 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
               <FolderOpen className="w-4 h-4" />
               <span>Bilgisayarımdan Dosya Seç</span>
             </button>
+
+            {isWebMode() && (
+              <div className="mt-4 p-3 bg-[#F3EFEA] border-l-4 border-[#0E254A] text-left text-xs text-[#5A5D66] font-medium flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-[#16171A] mb-0.5">Masaüstü Sürümü Gereklidir</p>
+                  <span>Adli anonimleştirme ve TCKN kazıma motoru yerel Windows masaüstü sürümünde çalışır.</span>
+                </div>
+                <a
+                  href="/downloads/Paralegal_Setup.exe"
+                  download="Paralegal_Setup.exe"
+                  onClick={(e) => e.stopPropagation()}
+                  className="btn-primary-court px-3 py-1.5 text-xs font-bold shrink-0 ml-3"
+                >
+                  İndir (.exe)
+                </a>
+              </div>
+            )}
           </motion.div>
         </div>
       ) : (
@@ -1739,6 +1768,19 @@ export const RedactorWorkspace: React.FC<RedactorWorkspaceProps> = ({ onBackToHu
         redactions={redactions}
         onConfirmSeal={executeActualRedactionSave}
         isSaving={isSaving}
+      />
+
+      {/* Web Ortamında Masaüstü Yükseltme Modalı */}
+      <DesktopUpsellModal
+        isOpen={showUpsellModal}
+        onClose={() => setShowUpsellModal(false)}
+        title="Masaüstü Sürümü Gereklidir"
+        subtitle="KVKK & Adli Evrak Koruma Bildirimi"
+        customMessage="Adli Belge Anonimleştirme (TCKN, isim, sicil no ve kurum bilgilerini kalıcı kazıma) motoru %100 yerel veri gizliliği ve güvenlik için Python masaüstü çekirdeği gerektirir."
+        customReasons={[
+          "Hassas hukuki evraklarınız buluta yüklenmeden yerel bilgisayarınızda taranır.",
+          "Yapay zeka ve adli mühür sertifikası masaüstü çekirdeğiyle oluşturulur."
+        ]}
       />
 
       {/* Global Adli Komut Paleti (Ctrl+K) */}

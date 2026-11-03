@@ -2,10 +2,36 @@ import { FilterSettings, PDFMeta, RedactionItem, FileSizeInfo, PDFInfo } from '.
 
 const API_BASE = window.location.port === '3000' ? 'http://127.0.0.1:52410' : '';
 
+async function safeJson<T = any>(res: Response, defaultError: string = 'İşlem başarısız'): Promise<T> {
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    let msg = defaultError;
+    if (text && text.trim()) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.error) msg = parsed.error;
+      } catch {
+        msg = `${defaultError} (${res.status})`;
+      }
+    } else {
+      msg = `${defaultError} (${res.status})`;
+    }
+    throw new Error(msg);
+  }
+  if (!text || !text.trim()) {
+    return {} as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
 export const api = {
   async health(): Promise<{ status: string; app: string; offline: boolean }> {
     const res = await fetch(`${API_BASE}/api/health`);
-    return res.json();
+    return safeJson(res, 'Sunucuya bağlanılamadı');
   },
 
   async uploadFile(file: File): Promise<string> {
@@ -29,11 +55,7 @@ export const api = {
               data: base64Data,
             }),
           });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Dosya yükleme başarısız oldu');
-          }
-          const data = await res.json();
+          const data = await safeJson(res, 'Dosya yükleme başarısız oldu');
           const targetPath = data.path || data.filePath;
           if (!targetPath) {
             throw new Error('Dosya yolu alınamadı');
@@ -54,7 +76,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ max_age_seconds: maxAgeSeconds }),
     });
-    return res.json();
+    return safeJson(res, 'Geçici dosyalar temizlenemedi');
   },
 
   async chooseFile(type: 'pdf' | 'image' = 'pdf'): Promise<string | null> {
@@ -63,8 +85,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type }),
     });
-    const data = await res.json();
-    return data.path;
+    const data = await safeJson(res, 'Dosya seçici açılamadı');
+    return data.path || null;
   },
 
   async chooseFiles(fileType: string = 'converter'): Promise<string[]> {
@@ -73,7 +95,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_type: fileType }),
     });
-    const data = await res.json();
+    const data = await safeJson(res, 'Dosya seçici açılamadı');
     return data.paths || [];
   },
 
@@ -87,8 +109,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ default_name: defaultName }),
     });
-    const data = await res.json();
-    return data.path;
+    const data = await safeJson(res, 'Kayıt yolu seçilemedi');
+    return data.path || null;
   },
 
   async chooseDirectory(): Promise<string | null> {
@@ -97,16 +119,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const data = await res.json();
-    return data.path;
+    const data = await safeJson(res, 'Klasör seçilemedi');
+    return data.path || null;
   },
 
   async openDirectory(path: string): Promise<void> {
-    await fetch(`${API_BASE}/api/open-directory`, {
+    const res = await fetch(`${API_BASE}/api/open-directory`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
+    await safeJson(res, 'Klasör açılamadı');
   },
 
   async loadPDF(pdfPath: string): Promise<PDFMeta> {
@@ -115,11 +138,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: pdfPath }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'PDF yüklenemedi');
-    }
-    return res.json();
+    return safeJson(res, 'PDF yüklenemedi');
   },
 
   getPageImageUrl(pdfPath: string, pageNum: number, dpi: number = 140): string {
@@ -146,11 +165,7 @@ export const api = {
         custom_keywords: customKeywords,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Tarama hatası');
-    }
-    return res.json();
+    return safeJson(res, 'Tarama hatası');
   },
 
   async searchText(
@@ -162,11 +177,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: pdfPath, text }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Arama hatası');
-    }
-    return res.json();
+    return safeJson(res, 'Arama hatası');
   },
 
   async applyRedactions(
@@ -189,11 +200,7 @@ export const api = {
         attach_certificate: attachCertificate,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Redaksiyon uygulanamadı');
-    }
-    return res.json();
+    return safeJson(res, 'Redaksiyon uygulanamadı');
   },
 
   getImageThumbnailUrl(imgPath: string, rotation: number = 0): string {
@@ -222,11 +229,7 @@ export const api = {
         excel_options: excelOptions || {},
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Dönüştürme hatası');
-    }
-    return res.json();
+    return safeJson(res, 'Dönüştürme hatası');
   },
 
   async analyzeExcel(excelPath: string): Promise<{
@@ -239,11 +242,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: excelPath }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Excel analizi başarısız');
-    }
-    return res.json();
+    return safeJson(res, 'Excel analizi başarısız');
   },
 
   async convertExcel(
@@ -264,11 +263,7 @@ export const api = {
         repeat_header: repeatHeader,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Excel dönüştürme hatası');
-    }
-    return res.json();
+    return safeJson(res, 'Excel dönüştürme hatası');
   },
 
   async convertWord(
@@ -283,11 +278,7 @@ export const api = {
         output_path: outputPath,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Word dönüştürme hatası');
-    }
-    return res.json();
+    return safeJson(res, 'Word dönüştürme hatası');
   },
 
   async convertMsg(
@@ -302,11 +293,7 @@ export const api = {
         output_path: outputPath,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'E-posta dönüştürme hatası');
-    }
-    return res.json();
+    return safeJson(res, 'E-posta dönüştürme hatası');
   },
 
   async convertEmail(
@@ -330,11 +317,7 @@ export const api = {
         add_bookmarks: addBookmarks,
       }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'PDF birleştirme hatası');
-    }
-    return res.json();
+    return safeJson(res, 'PDF birleştirme hatası');
   },
 
   async getPdfInfo(path: string): Promise<PDFInfo> {
@@ -343,11 +326,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'PDF bilgisi alınamadı');
-    }
-    return res.json();
+    return safeJson(res, 'PDF bilgisi alınamadı');
   },
 
   async getFileSizes(paths: string[]): Promise<FileSizeInfo[]> {
@@ -359,14 +338,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paths }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Dosya boyutları alınamadı');
-    }
-    const data = await res.json();
+    const data = await safeJson(res, 'Dosya boyutları alınamadı');
     return Array.isArray(data) ? data : (data.files || []);
   },
 };
 
 export const getFileSizes = api.getFileSizes;
-
