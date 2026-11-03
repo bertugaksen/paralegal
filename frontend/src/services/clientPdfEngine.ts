@@ -81,7 +81,8 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
  */
 export async function mergePdfsClientSide(
   files: File[],
-  customFilename?: string
+  customFilenameOrAddBookmarks?: string | boolean,
+  optionalFilename?: string
 ): Promise<PdfOperationResult> {
   if (!files || files.length === 0) {
     throw new Error('Birleştirme işlemi için en az bir PDF dosyası seçilmelidir.');
@@ -113,8 +114,15 @@ export async function mergePdfsClientSide(
 
   const pdfBytes = await mergedPdf.save();
   const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
-  const filename =
-    customFilename?.trim() || `birlestirilmis_belge_${Date.now()}.pdf`;
+  let safeFilename = '';
+  if (typeof customFilenameOrAddBookmarks === 'string' && customFilenameOrAddBookmarks.trim()) {
+    safeFilename = customFilenameOrAddBookmarks.trim();
+  } else if (typeof optionalFilename === 'string' && optionalFilename.trim()) {
+    safeFilename = optionalFilename.trim();
+  } else {
+    safeFilename = `birlestirilmis_belge_${Date.now()}.pdf`;
+  }
+  const filename = safeFilename;
 
   return {
     blob,
@@ -224,7 +232,9 @@ export async function convertImagesToPdfClientSide(
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
   const filename =
-    customFilename?.trim() || `gorsellerden_pdf_${Date.now()}.pdf`;
+    (typeof customFilename === 'string' && customFilename.trim())
+      ? customFilename.trim()
+      : `gorsellerden_pdf_${Date.now()}.pdf`;
 
   return {
     blob,

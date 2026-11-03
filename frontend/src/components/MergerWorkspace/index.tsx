@@ -349,7 +349,9 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
           throw new Error('Dosyalar tarayıcı hafızasında bulunamadı. Lütfen dosyaları tekrar seçin.');
         }
 
-        const result = await mergePdfsClientSide(orderedFiles, addBookmarks);
+        const firstStem = (selectedPaths[0] || 'dosya').replace(/\.pdf$/i, '');
+        const outFilename = `${firstStem}_birlestirilmis.pdf`;
+        const result = await mergePdfsClientSide(orderedFiles, addBookmarks, outFilename);
         downloadBlob(result.blob, result.filename);
 
         setMergedResult({
