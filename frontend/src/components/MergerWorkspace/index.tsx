@@ -416,7 +416,7 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#F4EFEA] text-[#121316] select-none pb-28">
+    <div className="min-h-screen flex flex-col bg-[#F4EFEA] text-[#121316]">
       {/* Gizli Tarayıcı Dosya Seçici */}
       <input
         ref={fileInputRef}
@@ -434,86 +434,85 @@ export const MergerWorkspace: React.FC<MergerWorkspaceProps> = ({
       />
 
       {/* Üst Navigasyon Çubuğu */}
-      <header className="sticky top-0 z-40 bg-[#FFFFFF] border-b-2 border-[#121316] px-4 sm:px-6 py-3.5 brutal-shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="h-16 border-b-2 border-[#121316] bg-[#FFFFFF] px-6 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onBackToHub}
-            className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] text-[#121316] text-xs font-bold flex items-center gap-1.5 hover:bg-[#121316] hover:text-white"
+            className="brutal-btn px-3 py-1.5 bg-[#F4EFEA] hover:bg-[#121316] hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Ana Menü</span>
           </button>
-
-          <div className="h-6 w-0.5 bg-[#121316]/20 mx-1 hidden sm:block" />
-
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-black tracking-widest uppercase px-1.5 py-0.5 bg-[#121316] text-white">
-                PDF BİRLEŞTİRME
-              </span>
-              <h1 className="text-sm sm:text-base font-black tracking-tight text-[#121316]">
-                Tek Parça Dava Dosyası Oluştur
-              </h1>
-            </div>
-            <p className="text-[11px] text-[#575A65] font-semibold hidden md:block">
-              Farklı PDF belgelerini sıralı, içindekiler fihristiyle ve UYAP uyumlu olarak birleştirin.
-            </p>
+          <div className="h-5 w-[1.5px] bg-[#121316]/20" />
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#121316]" />
+            <h2 className="font-black text-sm tracking-tight">PDF Birleştirici</h2>
           </div>
         </div>
 
-        {/* Sağ Güvenlik Rozeti */}
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F4EFEA] border border-[#121316] text-xs font-bold text-[#121316]">
-            <Shield className="w-3.5 h-3.5 text-[#1E3A8A]" />
-            <span className="hidden sm:inline">Yerel İşlem</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
+        <div className="flex items-center gap-3">
+          {selectedPaths.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedPaths([]);
+                setPdfInfos({});
+                clientFilesMap.current.clear();
+              }}
+              className="text-xs font-bold text-[#575A65] hover:text-[#121316] flex items-center gap-1 underline"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Listeyi Temizle</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Ana Çalışma Alanı */}
-      <main className="max-w-5xl xl:max-w-6xl mx-auto w-full p-4 sm:p-6 md:p-8 flex-1 flex flex-col">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-6 md:p-8 flex flex-col justify-between">
         {selectedPaths.length === 0 ? (
-          /* Boş Durum: Büyük Neobrutalist Bırakma Alanı */
+          /* Single Expansive Drag & Drop Zone (Boş Durum) */
           <div
+            className="my-auto"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`my-auto p-8 sm:p-12 md:p-16 border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-150 brutal-shadow ${
-              isDragging
-                ? 'border-[#1E3A8A] bg-[#1E3A8A]/10 scale-[1.01]'
-                : 'border-[#121316] bg-[#FFFFFF] hover:border-[#1E3A8A]'
-            }`}
-            onClick={handleAddPdfs}
           >
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F4EFEA] border-2 border-[#121316] flex items-center justify-center mb-6 brutal-shadow-sm text-[#121316]">
-              <Layers className="w-8 h-8 sm:w-10 sm:h-10 text-[#1E3A8A]" />
-            </div>
-
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-[#121316] mb-3 tracking-tight">
-              Birleştirilecek PDF Belgelerini Seçin
-            </h2>
-
-            <p className="text-xs sm:text-sm text-[#575A65] max-w-md font-medium leading-relaxed mb-6">
-              Bilgisayarınızda kayıtlı olan veya Paralegal ile dönüştürdüğünüz tüm .pdf dosyalarını buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
-            </p>
-
-            <button
-              type="button"
-              className="brutal-btn px-6 py-3.5 bg-[#121316] text-white font-bold text-sm flex items-center gap-2 hover:bg-[#1E3A8A] transition-colors"
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={handleAddPdfs}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`brutal-card p-12 text-center bg-[#FFFFFF] cursor-pointer transition-all border-2 border-dashed ${
+                isDragging
+                  ? 'border-[#1E3A8A] bg-[#1E3A8A]/5 ring-4 ring-[#1E3A8A]/20'
+                  : 'border-[#121316] hover:border-[#1E3A8A]'
+              }`}
             >
-              <FolderOpen className="w-4 h-4" />
-              <span>PDF Dosyaları Seç</span>
-            </button>
+              <div className={`w-20 h-20 border-2 flex items-center justify-center mx-auto mb-6 brutal-shadow-sm transition-colors ${
+                isDragging ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]' : 'bg-[#F4EFEA] border-[#121316] text-[#121316]'
+              }`}>
+                <Layers className="w-10 h-10" />
+              </div>
 
-            {/* Delil / Belge Hapları */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-8 pt-6 border-t border-[#121316]/10 text-[11px] font-bold text-[#575A65]">
-              <span className="px-2 py-1 bg-[#F4EFEA] border border-[#121316]/20">Dava & Cevap Dilekçeleri</span>
-              <span className="px-2 py-1 bg-[#F4EFEA] border border-[#121316]/20">Tensip Zabıtları</span>
-              <span className="px-2 py-1 bg-[#F4EFEA] border border-[#121316]/20">Delil Listeleri & Faturalar</span>
-              <span className="px-2 py-1 bg-[#F4EFEA] border border-[#121316]/20">Bilirkişi Raporları</span>
-            </div>
+              <h3 className="text-2xl font-black text-[#121316] mb-2">
+                {isDragging ? 'Dosyaları Buraya Bırakın' : 'Birleştirilecek PDF belgelerini seçin.'}
+              </h3>
+              <p className="text-sm text-[#575A65] max-w-lg mx-auto mb-6 font-medium">
+                Bilgisayarınızda kayıtlı olan veya Paralegal ile dönüştürdüğünüz tüm .pdf dosyalarını seçin. Dosyaları buraya sürükleyip bırakabilir veya tıklayabilirsiniz.
+              </p>
+
+              <button
+                type="button"
+                className="brutal-btn py-3.5 px-8 bg-[#121316] text-white font-bold text-sm inline-flex items-center gap-2 hover:bg-[#1E3A8A] transition-colors"
+              >
+                <FolderOpen className="w-4 h-4" />
+                <span>Bilgisayardan Dosya Seç</span>
+              </button>
+            </motion.div>
           </div>
         ) : (
           /* Dolu Durum: Dosya Listesi, Sıralama ve Seçenekler */
